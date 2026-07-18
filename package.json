@@ -1,0 +1,36 @@
+{
+  "name": "bokio-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for the Bokio accounting API (private Bearer-token auth, single-company)",
+  "type": "module",
+  "bin": {
+    "bokio-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "smoke": "node scripts/smoke.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "license": "MIT",
+  "keywords": ["mcp", "bokio", "accounting", "bokforing", "sie"]
+}
