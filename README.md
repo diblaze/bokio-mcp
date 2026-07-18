@@ -1,5 +1,7 @@
 # bokio-mcp
 
+[![CI](https://github.com/diblaze/bokio-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/diblaze/bokio-mcp/actions/workflows/ci.yml)
+
 Model Context Protocol server for the [Bokio](https://www.bokio.se/) accounting API.
 
 - **Auth:** private self-serve Bearer token (single company). No OAuth.
@@ -12,17 +14,18 @@ Built for driving a Swedish AB's books alongside a YNAB budget. Read-only by def
 
 1. A Bokio private API token: **Bokio → Inställningar → API Tokens** (free up to 5,000 requests/month).
 2. Your company id — copy it from the Bokio browser URL (`.../companies/<companyId>/...`).
-3. Node.js ≥ 20.
+3. Node.js ≥ 20 and [pnpm](https://pnpm.io) (`corepack enable`).
 
 ## Install & build (local)
 
 ```bash
-git clone <this-repo> ~/git/bokio-mcp
+git clone https://github.com/diblaze/bokio-mcp.git ~/git/bokio-mcp
 cd ~/git/bokio-mcp
-npm install
-npm run build      # → dist/
-npm test           # mocked unit tests
-npm run smoke      # MCP handshake, asserts tools register
+pnpm install
+pnpm run build     # → dist/
+pnpm test          # mocked unit tests
+pnpm run smoke     # MCP handshake, asserts tools register
+pnpm run lint      # biome check (lint + format)
 ```
 
 ## Configure in Claude Code
@@ -81,3 +84,13 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 - SIE download is great for reconciling the AB ledger against an external budget.
 - `[Preview]` Bokio endpoints (supplier-invoices, suppliers, tag-groups) are not yet wrapped; reach them via `bokio_raw_get`.
 - API reference: <https://docs.bokio.se> · specs: <https://github.com/bokio/bokio-api>
+
+## Contributing
+
+`main` is protected — external changes land via pull request.
+
+1. Fork, branch, commit.
+2. Ensure `pnpm exec biome ci`, `pnpm run typecheck`, `pnpm test`, `pnpm run build`, and `pnpm run smoke` all pass (CI runs the same on Node 22).
+3. Open a PR against `main`. CI must be green and a maintainer (@diblaze, per `CODEOWNERS`) must approve before merge.
+
+Toolchain: TypeScript + pnpm, [Biome](https://biomejs.dev) for lint/format, [Vitest](https://vitest.dev) for tests.

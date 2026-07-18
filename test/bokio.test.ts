@@ -1,6 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { bokioRequest, downloadTarget, filterQuery, resolveCompanyId, writesAllowed } from "../src/bokio.js";
 import { resolve } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  bokioRequest,
+  downloadTarget,
+  filterQuery,
+  resolveCompanyId,
+  writesAllowed,
+} from "../src/bokio.js";
 
 describe("filterQuery", () => {
   it("returns undefined when nothing is given", () => {
@@ -12,15 +18,17 @@ describe("filterQuery", () => {
   });
 
   it("keeps a raw filter and appends bounds in order", () => {
-    expect(filterQuery("2026-07-01", undefined, "title=rent")).toBe("title=rent and date>=2026-07-01");
+    expect(filterQuery("2026-07-01", undefined, "title=rent")).toBe(
+      "title=rent and date>=2026-07-01",
+    );
     expect(filterQuery(undefined, undefined, "title=rent")).toBe("title=rent");
   });
 });
 
 function mockFetch(status: number, body: unknown, contentType = "application/json") {
   const text = typeof body === "string" ? body : JSON.stringify(body);
-  return vi.fn(async () =>
-    new Response(text, { status, headers: { "content-type": contentType } }),
+  return vi.fn(
+    async () => new Response(text, { status, headers: { "content-type": contentType } }),
   );
 }
 

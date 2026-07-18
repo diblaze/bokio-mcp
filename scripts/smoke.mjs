@@ -14,8 +14,9 @@ const pending = new Map();
 
 child.stdout.on("data", (chunk) => {
   buf += chunk.toString();
-  let nl;
-  while ((nl = buf.indexOf("\n")) >= 0) {
+  for (;;) {
+    const nl = buf.indexOf("\n");
+    if (nl < 0) break;
     const line = buf.slice(0, nl).trim();
     buf = buf.slice(nl + 1);
     if (!line) continue;

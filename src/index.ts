@@ -2,16 +2,16 @@
 import { writeFile } from "node:fs/promises";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z, type ZodRawShape } from "zod";
+import { type ZodRawShape, z } from "zod";
 import {
-  bokioRequest,
   bokioDownload,
+  bokioRequest,
   downloadTarget,
   fileForm,
   filterQuery,
+  type Query,
   resolveCompanyId,
   writesAllowed,
-  type Query,
 } from "./bokio.js";
 
 const server = new McpServer({ name: "bokio-mcp", version: "0.1.0" });
@@ -29,8 +29,10 @@ function tool(
   name: string,
   description: string,
   shape: ZodRawShape,
+  // biome-ignore lint/suspicious/noExplicitAny: handler args are runtime-validated by zod at the tool layer
   handler: (args: any) => Promise<Result>,
 ): void {
+  // biome-ignore lint/suspicious/noExplicitAny: registerTool passes zod-parsed args
   server.registerTool(name, { description, inputSchema: shape }, async (args: any) => {
     try {
       return await handler(args ?? {});
@@ -52,7 +54,7 @@ const pageSize = z.number().int().positive().max(200).optional().describe("Items
 const query = z
   .string()
   .optional()
-  .describe("Bokio filter query, e.g. \"date>=2026-07-01 and date<=2026-07-31\"");
+  .describe('Bokio filter query, e.g. "date>=2026-07-01 and date<=2026-07-31"');
 const passthrough = z
   .record(z.string(), z.any())
   .describe("Raw request body object; fields map 1:1 to the Bokio API schema.");
@@ -69,15 +71,19 @@ tool("bokio_company_info", "Retrieve company information.", { companyId }, async
   ok(await bokioRequest({ path: `${cbase(a.companyId)}/company-information` })),
 );
 
-tool("bokio_list_fiscal_years", "List fiscal years (needed for SIE export ids).", { companyId }, async (a) =>
-  ok(await bokioRequest({ path: `${cbase(a.companyId)}/fiscal-years` })),
+tool(
+  "bokio_list_fiscal_years",
+  "List fiscal years (needed for SIE export ids).",
+  { companyId },
+  async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/fiscal-years` })),
 );
 
 tool(
   "bokio_get_fiscal_year",
   "Get a single fiscal year by id.",
   { fiscalYearId: z.string(), companyId },
-  async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/fiscal-years/${a.fiscalYearId}` })),
+  async (a) =>
+    ok(await bokioRequest({ path: `${cbase(a.companyId)}/fiscal-years/${a.fiscalYearId}` })),
 );
 
 tool(
@@ -92,7 +98,8 @@ tool(
   "bokio_get_account",
   "Get one account from the chart of accounts.",
   { account: z.number().int(), companyId },
-  async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/chart-of-accounts/${a.account}` })),
+  async (a) =>
+    ok(await bokioRequest({ path: `${cbase(a.companyId)}/chart-of-accounts/${a.account}` })),
 );
 
 tool(
@@ -127,7 +134,8 @@ tool(
   "bokio_get_journal_entry",
   "Get a journal entry by id.",
   { journalEntryId: z.string(), companyId },
-  async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/journal-entries/${a.journalEntryId}` })),
+  async (a) =>
+    ok(await bokioRequest({ path: `${cbase(a.companyId)}/journal-entries/${a.journalEntryId}` })),
 );
 
 tool(
@@ -154,7 +162,12 @@ tool(
       await bokioRequest({
         method: "POST",
         path: `${cbase(a.companyId)}/journal-entries`,
-        body: { title: a.title, date: a.date, journalEntryNumber: a.journalEntryNumber, items: a.items },
+        body: {
+          title: a.title,
+          date: a.date,
+          journalEntryNumber: a.journalEntryNumber,
+          items: a.items,
+        },
       }),
     ),
 );
@@ -193,7 +206,13 @@ tool(
   "Create an invoice. Required in body: invoiceDate, lineItems. WRITE.",
   { companyId, invoice: passthrough },
   async (a) =>
-    ok(await bokioRequest({ method: "POST", path: `${cbase(a.companyId)}/invoices`, body: a.invoice })),
+    ok(
+      await bokioRequest({
+        method: "POST",
+        path: `${cbase(a.companyId)}/invoices`,
+        body: a.invoice,
+      }),
+    ),
 );
 
 tool(
@@ -215,7 +234,12 @@ tool(
   "Delete an invoice. WRITE.",
   { invoiceId: z.string(), companyId },
   async (a) =>
-    ok(await bokioRequest({ method: "DELETE", path: `${cbase(a.companyId)}/invoices/${a.invoiceId}` })),
+    ok(
+      await bokioRequest({
+        method: "DELETE",
+        path: `${cbase(a.companyId)}/invoices/${a.invoiceId}`,
+      }),
+    ),
 );
 
 tool(
@@ -284,7 +308,12 @@ tool(
 tool(
   "bokio_create_customer",
   "Create a customer. Required: name, type. WRITE.",
-  { companyId, name: z.string(), type: z.string().describe("e.g. Company or Individual"), extra: passthrough.optional() },
+  {
+    companyId,
+    name: z.string(),
+    type: z.string().describe("e.g. Company or Individual"),
+    extra: passthrough.optional(),
+  },
   async (a) =>
     ok(
       await bokioRequest({
@@ -315,19 +344,12 @@ tool("bokio_list_items", "List items (articles).", { companyId, page, pageSize }
   ok(await bokioRequest({ path: `${cbase(a.companyId)}/items`, query: paging(a) })),
 );
 
-tool(
-  "bokio_get_item",
-  "Get an item by id.",
-  { itemId: z.string(), companyId },
-  async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/items/${a.itemId}` })),
+tool("bokio_get_item", "Get an item by id.", { itemId: z.string(), companyId }, async (a) =>
+  ok(await bokioRequest({ path: `${cbase(a.companyId)}/items/${a.itemId}` })),
 );
 
-tool(
-  "bokio_create_item",
-  "Create an item. WRITE.",
-  { companyId, item: passthrough },
-  async (a) =>
-    ok(await bokioRequest({ method: "POST", path: `${cbase(a.companyId)}/items`, body: a.item })),
+tool("bokio_create_item", "Create an item. WRITE.", { companyId, item: passthrough }, async (a) =>
+  ok(await bokioRequest({ method: "POST", path: `${cbase(a.companyId)}/items`, body: a.item })),
 );
 
 tool(
@@ -346,8 +368,11 @@ tool(
 
 // ---- uploads ---------------------------------------------------------------
 
-tool("bokio_list_uploads", "List uploaded files / receipts.", { companyId, page, pageSize }, async (a) =>
-  ok(await bokioRequest({ path: `${cbase(a.companyId)}/uploads`, query: paging(a) })),
+tool(
+  "bokio_list_uploads",
+  "List uploaded files / receipts.",
+  { companyId, page, pageSize },
+  async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/uploads`, query: paging(a) })),
 );
 
 tool(
@@ -372,9 +397,7 @@ tool(
       description: a.description,
       journalEntryId: a.journalEntryId,
     });
-    return ok(
-      await bokioRequest({ method: "POST", path: `${cbase(a.companyId)}/uploads`, form }),
-    );
+    return ok(await bokioRequest({ method: "POST", path: `${cbase(a.companyId)}/uploads`, form }));
   },
 );
 
@@ -398,11 +421,15 @@ tool(
   {
     path: z.string().describe("e.g. /companies/{companyId}/credit-notes"),
     companyId,
-    params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe("Scalar query params"),
+    params: z
+      .record(z.string(), z.union([z.string(), z.number()]))
+      .optional()
+      .describe("Scalar query params"),
   },
   async (a) => {
     let path: string = a.path.startsWith("/") ? a.path : `/${a.path}`;
-    if (path.includes("{companyId}")) path = path.replaceAll("{companyId}", resolveCompanyId(a.companyId));
+    if (path.includes("{companyId}"))
+      path = path.replaceAll("{companyId}", resolveCompanyId(a.companyId));
     return ok(await bokioRequest({ path, query: a.params as Query | undefined }));
   },
 );
@@ -412,9 +439,7 @@ tool(
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  process.stderr.write(
-    `bokio-mcp ready (writes ${writesAllowed() ? "ENABLED" : "disabled"})\n`,
-  );
+  process.stderr.write(`bokio-mcp ready (writes ${writesAllowed() ? "ENABLED" : "disabled"})\n`);
 }
 
 main().catch((err) => {

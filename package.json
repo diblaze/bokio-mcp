@@ -11,7 +11,8 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "pnpm": ">=9"
   },
   "scripts": {
     "build": "tsc",
@@ -19,18 +20,28 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "lint": "biome check",
+    "format": "biome check --write"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.4",
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },
   "license": "MIT",
-  "keywords": ["mcp", "bokio", "accounting", "bokforing", "sie"]
+  "keywords": [
+    "mcp",
+    "bokio",
+    "accounting",
+    "bokforing",
+    "sie"
+  ],
+  "packageManager": "pnpm@11.9.0"
 }
