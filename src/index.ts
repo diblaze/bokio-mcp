@@ -6,6 +6,7 @@ import { z, type ZodRawShape } from "zod";
 import {
   bokioRequest,
   bokioDownload,
+  downloadTarget,
   fileForm,
   resolveCompanyId,
   writesAllowed,
@@ -100,8 +101,9 @@ tool(
   async (a) => {
     const buf = await bokioDownload(`${cbase(a.companyId)}/sie/${a.fiscalYearId}/download`);
     if (a.savePath) {
-      await writeFile(a.savePath, buf);
-      return ok(`Wrote ${buf.length} bytes to ${a.savePath}`);
+      const target = downloadTarget(a.savePath);
+      await writeFile(target, buf);
+      return ok(`Wrote ${buf.length} bytes to ${target}`);
     }
     return ok(buf.toString("latin1").slice(0, 4000));
   },
@@ -385,8 +387,9 @@ tool(
   { uploadId: z.string(), companyId, savePath: z.string() },
   async (a) => {
     const buf = await bokioDownload(`${cbase(a.companyId)}/uploads/${a.uploadId}/download`);
-    await writeFile(a.savePath, buf);
-    return ok(`Wrote ${buf.length} bytes to ${a.savePath}`);
+    const target = downloadTarget(a.savePath);
+    await writeFile(target, buf);
+    return ok(`Wrote ${buf.length} bytes to ${target}`);
   },
 );
 
@@ -395,10 +398,14 @@ tool(
 tool(
   "bokio_raw_get",
   "GET an arbitrary Bokio API path (read-only escape hatch). {companyId} is substituted.",
-  { path: z.string().describe("e.g. /companies/{companyId}/credit-notes"), companyId, params: passthrough.optional() },
+  {
+    path: z.string().describe("e.g. /companies/{companyId}/credit-notes"),
+    companyId,
+    params: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe("Scalar query params"),
+  },
   async (a) => {
     let path: string = a.path.startsWith("/") ? a.path : `/${a.path}`;
-    if (path.includes("{companyId}")) path = path.replace("{companyId}", resolveCompanyId(a.companyId));
+    if (path.includes("{companyId}")) path = path.replaceAll("{companyId}", resolveCompanyId(a.companyId));
     return ok(await bokioRequest({ path, query: a.params as Query | undefined }));
   },
 );

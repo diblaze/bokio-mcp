@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { bokioRequest, resolveCompanyId, writesAllowed } from "../src/bokio.js";
+import { bokioRequest, downloadTarget, resolveCompanyId, writesAllowed } from "../src/bokio.js";
+import { resolve } from "node:path";
 
 function mockFetch(status: number, body: unknown, contentType = "application/json") {
   const text = typeof body === "string" ? body : JSON.stringify(body);
@@ -35,6 +36,30 @@ describe("config", () => {
     expect(writesAllowed()).toBe(true);
     process.env.BOKIO_ALLOW_WRITES = "no";
     expect(writesAllowed()).toBe(false);
+  });
+});
+
+describe("downloadTarget", () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+  });
+
+  it("resolves to an absolute path when no download dir is set", () => {
+    delete process.env.BOKIO_DOWNLOAD_DIR;
+    expect(downloadTarget("foo.sie")).toBe(resolve("foo.sie"));
+  });
+
+  it("confines within BOKIO_DOWNLOAD_DIR", () => {
+    process.env.BOKIO_DOWNLOAD_DIR = "/tmp/dl";
+    expect(downloadTarget("a.sie")).toBe(resolve("/tmp/dl", "a.sie"));
+    expect(downloadTarget("sub/a.sie")).toBe(resolve("/tmp/dl", "sub/a.sie"));
+  });
+
+  it("rejects path traversal out of BOKIO_DOWNLOAD_DIR", () => {
+    process.env.BOKIO_DOWNLOAD_DIR = "/tmp/dl";
+    expect(() => downloadTarget("../escape.sie")).toThrow(/escapes BOKIO_DOWNLOAD_DIR/);
+    expect(() => downloadTarget("/etc/passwd")).toThrow(/escapes BOKIO_DOWNLOAD_DIR/);
   });
 });
 

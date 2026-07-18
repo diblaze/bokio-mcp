@@ -1,8 +1,27 @@
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, resolve, sep } from "node:path";
 
 const DEFAULT_BASE = "https://api.bokio.se/v1";
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Resolve a local download path. When BOKIO_DOWNLOAD_DIR is set, confine the
+ * target inside it (reject path traversal); otherwise resolve to an absolute
+ * path. Prevents an LLM-supplied savePath from clobbering arbitrary files.
+ */
+export function downloadTarget(savePath: string): string {
+  const dir = process.env.BOKIO_DOWNLOAD_DIR;
+  if (dir) {
+    const base = resolve(dir);
+    const target = resolve(base, savePath);
+    if (target !== base && !target.startsWith(base + sep)) {
+      throw new Error(`savePath escapes BOKIO_DOWNLOAD_DIR (${dir})`);
+    }
+    return target;
+  }
+  return resolve(savePath);
+}
 
 export function baseUrl(): string {
   return (process.env.BOKIO_BASE_URL ?? DEFAULT_BASE).replace(/\/+$/, "");
@@ -70,7 +89,12 @@ export async function bokioRequest<T = unknown>(opts: RequestOpts): Promise<T> {
     bodyInit = JSON.stringify(opts.body);
   }
 
-  const res = await fetch(buildUrl(opts.path, opts.query), { method, headers, body: bodyInit });
+  const res = await fetch(buildUrl(opts.path, opts.query), {
+    method,
+    headers,
+    body: bodyInit,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   const text = await res.text();
   if (!res.ok) {
     throw new Error(
@@ -89,6 +113,7 @@ export async function bokioDownload(path: string, query?: Query): Promise<Buffer
   const res = await fetch(buildUrl(path, query), {
     method: "GET",
     headers: { Authorization: `Bearer ${token()}`, Accept: "*/*" },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!res.ok) {
     const text = await res.text();

@@ -56,6 +56,7 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 | `BOKIO_TOKEN` | yes (at call time) | Private Bearer token |
 | `BOKIO_COMPANY_ID` | default company | Omit a tool's `companyId` to use this |
 | `BOKIO_ALLOW_WRITES` | no | `1`/`true`/`yes`/`on` enables writes; otherwise blocked |
+| `BOKIO_DOWNLOAD_DIR` | no | Confines SIE/upload downloads to this dir (rejects path traversal) |
 | `BOKIO_BASE_URL` | no | Defaults to `https://api.bokio.se/v1` |
 
 ## Tools
