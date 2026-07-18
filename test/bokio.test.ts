@@ -1,6 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { bokioRequest, downloadTarget, resolveCompanyId, writesAllowed } from "../src/bokio.js";
+import { bokioRequest, downloadTarget, filterQuery, resolveCompanyId, writesAllowed } from "../src/bokio.js";
 import { resolve } from "node:path";
+
+describe("filterQuery", () => {
+  it("returns undefined when nothing is given", () => {
+    expect(filterQuery()).toBeUndefined();
+  });
+
+  it("builds date bounds", () => {
+    expect(filterQuery("2026-07-01", "2026-07-31")).toBe("date>=2026-07-01 and date<=2026-07-31");
+  });
+
+  it("keeps a raw filter and appends bounds in order", () => {
+    expect(filterQuery("2026-07-01", undefined, "title=rent")).toBe("title=rent and date>=2026-07-01");
+    expect(filterQuery(undefined, undefined, "title=rent")).toBe("title=rent");
+  });
+});
 
 function mockFetch(status: number, body: unknown, contentType = "application/json") {
   const text = typeof body === "string" ? body : JSON.stringify(body);

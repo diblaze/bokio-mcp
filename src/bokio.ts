@@ -23,8 +23,17 @@ export function downloadTarget(savePath: string): string {
   return resolve(savePath);
 }
 
-export function baseUrl(): string {
+function baseUrl(): string {
   return (process.env.BOKIO_BASE_URL ?? DEFAULT_BASE).replace(/\/+$/, "");
+}
+
+/** Join a raw filter with optional date bounds into a Bokio query string. */
+export function filterQuery(from?: string, to?: string, raw?: string): string | undefined {
+  const parts: string[] = [];
+  if (raw) parts.push(raw);
+  if (from) parts.push(`date>=${from}`);
+  if (to) parts.push(`date<=${to}`);
+  return parts.length ? parts.join(" and ") : undefined;
 }
 
 export function writesAllowed(): boolean {

@@ -8,6 +8,7 @@ import {
   bokioDownload,
   downloadTarget,
   fileForm,
+  filterQuery,
   resolveCompanyId,
   writesAllowed,
   type Query,
@@ -116,12 +117,8 @@ tool(
   "List journal entries (verifikationer). Use from/to for a date range or query for raw filters.",
   { companyId, page, pageSize, query, from: z.string().optional(), to: z.string().optional() },
   async (a) => {
-    const parts: string[] = [];
-    if (a.query) parts.push(a.query);
-    if (a.from) parts.push(`date>=${a.from}`);
-    if (a.to) parts.push(`date<=${a.to}`);
     const q = paging(a);
-    q.query = parts.length ? parts.join(" and ") : undefined;
+    q.query = filterQuery(a.from, a.to, a.query);
     return ok(await bokioRequest({ path: `${cbase(a.companyId)}/journal-entries`, query: q }));
   },
 );
