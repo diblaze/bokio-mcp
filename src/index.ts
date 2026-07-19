@@ -20,12 +20,34 @@ export const server = new McpServer({ name: "bokio-mcp", version: "0.1.0" });
 
 // ---- helpers ---------------------------------------------------------------
 
-type Result = { content: { type: "text"; text: string }[]; isError?: boolean };
+type Result = {
+    content: { type: "text"; text: string }[];
+    isError?: boolean;
+    structuredContent?: Record<string, unknown>;
+};
 
 function ok(data: unknown): Result {
     const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
     return { content: [{ type: "text", text }] };
 }
+
+// #4: text + structuredContent, so clients get typed data alongside the JSON text.
+// Only attaches structuredContent for plain objects (MCP requires an object).
+function okStructured(data: unknown): Result {
+    const r = ok(data);
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+        r.structuredContent = data as Record<string, unknown>;
+    }
+    return r;
+}
+
+// Permissive paginated envelope shared by Bokio list endpoints.
+const listOutput: ZodRawShape = {
+    items: z.array(z.record(z.string(), z.unknown())).optional(),
+    totalItems: z.number().optional(),
+    totalPages: z.number().optional(),
+    currentPage: z.number().optional(),
+};
 
 function tool(
     name: string,
@@ -33,6 +55,7 @@ function tool(
     shape: ZodRawShape,
     // biome-ignore lint/suspicious/noExplicitAny: handler args are runtime-validated by zod at the tool layer
     handler: (args: any) => Promise<Result>,
+    outputShape?: ZodRawShape,
 ): void {
     const isWrite = description.includes("WRITE.");
     // #3: a read-only deployment does not even advertise write tools
@@ -45,21 +68,20 @@ function tool(
               openWorldHint: true,
           }
         : { readOnlyHint: true, openWorldHint: true };
+    const config = outputShape
+        ? { description, inputSchema: shape, annotations, outputSchema: outputShape }
+        : { description, inputSchema: shape, annotations };
     // biome-ignore lint/suspicious/noExplicitAny: registerTool passes zod-parsed args
-    server.registerTool(
-        name,
-        { description, inputSchema: shape, annotations },
-        async (args: any) => {
-            try {
-                return await handler(args ?? {});
-            } catch (err) {
-                return {
-                    content: [{ type: "text", text: `ERROR: ${(err as Error).message}` }],
-                    isError: true,
-                };
-            }
-        },
-    );
+    server.registerTool(name, config, async (args: any) => {
+        try {
+            return await handler(args ?? {});
+        } catch (err) {
+            return {
+                content: [{ type: "text", text: `ERROR: ${(err as Error).message}` }],
+                isError: true,
+            };
+        }
+    });
 }
 
 const companyId = z
@@ -156,7 +178,8 @@ tool(
     "bokio_list_fiscal_years",
     "List fiscal years (needed for SIE export ids).",
     { companyId },
-    async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/fiscal-years` })),
+    async (a) => okStructured(await bokioRequest({ path: `${cbase(a.companyId)}/fiscal-years` })),
+    listOutput,
 );
 
 tool(
@@ -212,8 +235,11 @@ tool(
     async (a) => {
         const q = paging(a);
         q.query = filterQuery(a.from, a.to, a.query);
-        return ok(await bokioRequest({ path: `${cbase(a.companyId)}/journal-entries`, query: q }));
+        return okStructured(
+            await bokioRequest({ path: `${cbase(a.companyId)}/journal-entries`, query: q }),
+        );
     },
+    listOutput,
 );
 
 tool(
@@ -282,7 +308,10 @@ tool(
     "List customer invoices.",
     { companyId, page, pageSize, query },
     async (a) =>
-        ok(await bokioRequest({ path: `${cbase(a.companyId)}/invoices`, query: paging(a) })),
+        okStructured(
+            await bokioRequest({ path: `${cbase(a.companyId)}/invoices`, query: paging(a) }),
+        ),
+    listOutput,
 );
 
 tool(
@@ -385,8 +414,15 @@ tool(
 
 // ---- customers -------------------------------------------------------------
 
-tool("bokio_list_customers", "List customers.", { companyId, page, pageSize, query }, async (a) =>
-    ok(await bokioRequest({ path: `${cbase(a.companyId)}/customers`, query: paging(a) })),
+tool(
+    "bokio_list_customers",
+    "List customers.",
+    { companyId, page, pageSize, query },
+    async (a) =>
+        okStructured(
+            await bokioRequest({ path: `${cbase(a.companyId)}/customers`, query: paging(a) }),
+        ),
+    listOutput,
 );
 
 tool(
@@ -427,8 +463,13 @@ tool(
 
 // ---- items -----------------------------------------------------------------
 
-tool("bokio_list_items", "List items (articles).", { companyId, page, pageSize }, async (a) =>
-    ok(await bokioRequest({ path: `${cbase(a.companyId)}/items`, query: paging(a) })),
+tool(
+    "bokio_list_items",
+    "List items (articles).",
+    { companyId, page, pageSize },
+    async (a) =>
+        okStructured(await bokioRequest({ path: `${cbase(a.companyId)}/items`, query: paging(a) })),
+    listOutput,
 );
 
 tool("bokio_get_item", "Get an item by id.", { itemId: z.string(), companyId }, async (a) =>
@@ -460,7 +501,10 @@ tool(
     "List uploaded files / receipts.",
     { companyId, page, pageSize },
     async (a) =>
-        ok(await bokioRequest({ path: `${cbase(a.companyId)}/uploads`, query: paging(a) })),
+        okStructured(
+            await bokioRequest({ path: `${cbase(a.companyId)}/uploads`, query: paging(a) }),
+        ),
+    listOutput,
 );
 
 tool(

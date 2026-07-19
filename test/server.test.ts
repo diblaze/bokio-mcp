@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Writes must be enabled BEFORE importing the server module, since tool
 // registration reads BOKIO_ALLOW_WRITES at import time (#3).
@@ -27,6 +27,28 @@ describe("server tool surface", () => {
         expect(byName.get("bokio_create_journal_entry")?.readOnlyHint).toBe(false);
         expect(byName.get("bokio_delete_invoice")?.destructiveHint).toBe(true);
         expect(byName.get("bokio_update_invoice")?.idempotentHint).toBe(true);
+
+        // #4: a list tool returns structuredContent validated against its outputSchema.
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(
+                async () =>
+                    new Response(
+                        JSON.stringify({
+                            totalItems: 1,
+                            totalPages: 1,
+                            currentPage: 1,
+                            items: [{ id: "x" }],
+                        }),
+                        { status: 200, headers: { "content-type": "application/json" } },
+                    ),
+            ),
+        );
+        const listed = await client.callTool({ name: "bokio_list_invoices", arguments: {} });
+        expect((listed.structuredContent as { items?: unknown[] })?.items?.length).toBe(1);
+        vi.unstubAllGlobals();
 
         await client.close();
     });
