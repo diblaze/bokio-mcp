@@ -50,6 +50,13 @@ describe("server tool surface", () => {
         expect((listed.structuredContent as { items?: unknown[] })?.items?.length).toBe(1);
         vi.unstubAllGlobals();
 
+        // #5: reference data exposed as MCP resources.
+        const { resources } = await client.listResources();
+        expect(resources.map((r) => r.uri).sort()).toEqual([
+            "bokio://company/chart-of-accounts",
+            "bokio://company/info",
+        ]);
+
         await client.close();
     });
 });

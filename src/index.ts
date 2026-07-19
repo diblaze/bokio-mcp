@@ -568,6 +568,46 @@ tool(
     },
 );
 
+// ---- resources (stable reference data) -------------------------------------
+
+function reference(
+    name: string,
+    uri: string,
+    description: string,
+    path: (cid: string) => string,
+): void {
+    server.registerResource(
+        name,
+        uri,
+        { title: name, description, mimeType: "application/json" },
+        async (u) => {
+            const data = await bokioRequest({ path: path(resolveCompanyId()) });
+            return {
+                contents: [
+                    {
+                        uri: u.href,
+                        mimeType: "application/json",
+                        text: JSON.stringify(data, null, 2),
+                    },
+                ],
+            };
+        },
+    );
+}
+
+reference(
+    "company-info",
+    "bokio://company/info",
+    "Company information for the default Bokio company (BOKIO_COMPANY_ID).",
+    (cid) => `/companies/${cid}/company-information`,
+);
+reference(
+    "chart-of-accounts",
+    "bokio://company/chart-of-accounts",
+    "Chart of accounts (BAS) for the default company.",
+    (cid) => `/companies/${cid}/chart-of-accounts`,
+);
+
 // ---- boot ------------------------------------------------------------------
 
 async function main(): Promise<void> {
