@@ -5,6 +5,7 @@ import {
     downloadTarget,
     filterQuery,
     resolveCompanyId,
+    tokenWarning,
     writesAllowed,
 } from "../src/bokio.js";
 
@@ -24,6 +25,38 @@ describe("filterQuery", () => {
             "title=rent and date>=2026-07-01",
         );
         expect(filterQuery(undefined, undefined, "title=rent")).toBe("title=rent");
+    });
+});
+
+describe("error UX + token validation", () => {
+    const saved = { ...process.env };
+    afterEach(() => {
+        process.env = { ...saved };
+        vi.unstubAllGlobals();
+    });
+
+    it("tokenWarning flags unset, malformed, and accepts a plausible token", () => {
+        delete process.env.BOKIO_TOKEN;
+        expect(tokenWarning()).toMatch(/not set/);
+        process.env.BOKIO_TOKEN = "short";
+        expect(tokenWarning()).toMatch(/malformed/);
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        expect(tokenWarning()).toBeNull();
+    });
+
+    it("maps 401/404/429 to actionable hints", async () => {
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        for (const [status, re] of [
+            [401, /auth failed/],
+            [404, /verify the id/],
+            [429, /rate limited/],
+        ] as const) {
+            vi.stubGlobal(
+                "fetch",
+                vi.fn(async () => new Response("x", { status })),
+            );
+            await expect(bokioRequest({ path: "/x" })).rejects.toThrow(re);
+        }
     });
 });
 

@@ -12,6 +12,7 @@ import {
     filterQuery,
     type Query,
     resolveCompanyId,
+    tokenWarning,
     writesAllowed,
 } from "./bokio.js";
 
@@ -469,6 +470,8 @@ tool(
 async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
+    const warn = tokenWarning();
+    if (warn) process.stderr.write(`bokio-mcp: ${warn}\n`);
     process.stderr.write(`bokio-mcp ready (writes ${writesAllowed() ? "ENABLED" : "disabled"})\n`);
 }
 

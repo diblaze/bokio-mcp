@@ -77,6 +77,37 @@ function buildUrl(path: string, query?: Query): URL {
     return url;
 }
 
+/** Map an HTTP status to a short, agent-actionable hint (empty when none applies). */
+function statusHint(status: number): string {
+    switch (status) {
+        case 401:
+            return " — auth failed; check BOKIO_TOKEN (Bokio → Inställningar → API Tokens)";
+        case 403:
+            return " — token lacks permission for this resource";
+        case 404:
+            return " — not found; verify the id (list the collection first)";
+        case 429:
+            return " — rate limited (Bokio free tier: 5000 requests/month)";
+        default:
+            return status >= 500 ? " — Bokio server error; retry later" : "";
+    }
+}
+
+/**
+ * Startup sanity check on BOKIO_TOKEN. Returns a warning string or null.
+ * Does not throw — read tools can list without a token; calls fail later with a clear 401.
+ */
+export function tokenWarning(): string | null {
+    const t = process.env.BOKIO_TOKEN;
+    if (!t) {
+        return "BOKIO_TOKEN is not set — tool calls will fail (Bokio → Inställningar → API Tokens).";
+    }
+    if (t.trim() !== t || t.length < 20) {
+        return "BOKIO_TOKEN looks malformed (too short or surrounded by whitespace).";
+    }
+    return null;
+}
+
 /** JSON request. Enforces the write gate for mutating methods. */
 export async function bokioRequest<T = unknown>(opts: RequestOpts): Promise<T> {
     const method = (opts.method ?? "GET").toUpperCase();
@@ -107,7 +138,7 @@ export async function bokioRequest<T = unknown>(opts: RequestOpts): Promise<T> {
     const text = await res.text();
     if (!res.ok) {
         throw new Error(
-            `Bokio ${method} ${opts.path} -> ${res.status} ${res.statusText}: ${text.slice(0, 600)}`,
+            `Bokio ${method} ${opts.path} -> ${res.status} ${res.statusText}${statusHint(res.status)}: ${text.slice(0, 400)}`,
         );
     }
     const ct = res.headers.get("content-type") ?? "";
@@ -127,7 +158,7 @@ export async function bokioDownload(path: string, query?: Query): Promise<Buffer
     if (!res.ok) {
         const text = await res.text();
         throw new Error(
-            `Bokio GET ${path} -> ${res.status} ${res.statusText}: ${text.slice(0, 600)}`,
+            `Bokio GET ${path} -> ${res.status} ${res.statusText}${statusHint(res.status)}: ${text.slice(0, 400)}`,
         );
     }
     return Buffer.from(await res.arrayBuffer());
