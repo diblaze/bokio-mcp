@@ -22,7 +22,8 @@
     "smoke": "node scripts/smoke.mjs",
     "prepublishOnly": "npm run build",
     "lint": "biome check",
-    "format": "biome check --write"
+    "format": "biome check --write",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

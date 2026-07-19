@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Ensure every added/changed AGENTS.md has a sibling CLAUDE.md that imports it.
+node scripts/ensure-claude-imports.mjs
