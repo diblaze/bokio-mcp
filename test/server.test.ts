@@ -31,3 +31,20 @@ describe("server tool surface", () => {
         await client.close();
     });
 });
+
+describe("write-body schemas (#2)", () => {
+    it("validate required fields and enums", async () => {
+        const { invoiceBody, customerBody } = await import("../src/index.js");
+        expect(invoiceBody.safeParse({}).success).toBe(false);
+        expect(
+            invoiceBody.safeParse({ invoiceDate: "2026-01-01", lineItems: [{ description: "x" }] })
+                .success,
+        ).toBe(true);
+        expect(invoiceBody.safeParse({ invoiceDate: "2026-01-01", lineItems: [] }).success).toBe(
+            false,
+        );
+        expect(customerBody.safeParse({ name: "A" }).success).toBe(false); // missing type
+        expect(customerBody.safeParse({ name: "A", type: "company" }).success).toBe(true);
+        expect(customerBody.safeParse({ name: "A", type: "bogus" }).success).toBe(false); // enum
+    });
+});

@@ -72,9 +72,73 @@ const query = z
     .string()
     .optional()
     .describe('Bokio filter query, e.g. "date>=2026-07-01 and date<=2026-07-31"');
-const passthrough = z
-    .record(z.string(), z.any())
-    .describe("Raw request body object; fields map 1:1 to the Bokio API schema.");
+// Typed write-body schemas (modelled from the Bokio OpenAPI). `.catchall` keeps
+// any unmodelled/nested fields while still validating the documented ones.
+const addressSchema = z
+    .object({
+        line1: z.string(),
+        line2: z.string().optional(),
+        city: z.string(),
+        postalCode: z.string(),
+        country: z.string().describe("ISO country code, e.g. SE"),
+        countrySubdivision: z.string().optional(),
+    })
+    .catchall(z.unknown());
+
+export const customerBody = z
+    .object({
+        name: z.string(),
+        type: z.enum(["company", "private"]),
+        vatNumber: z.string().optional(),
+        orgNumber: z.string().optional(),
+        paymentTerms: z.string().optional(),
+        address: addressSchema.optional(),
+        contactsDetails: z
+            .array(
+                z
+                    .object({
+                        name: z.string().optional(),
+                        email: z.string().optional(),
+                        phone: z.string().optional(),
+                        isDefault: z.boolean().optional(),
+                    })
+                    .catchall(z.unknown()),
+            )
+            .optional(),
+        language: z.enum(["sv", "en"]).optional(),
+    })
+    .catchall(z.unknown());
+
+export const invoiceBody = z
+    .object({
+        invoiceDate: z.string().describe("YYYY-MM-DD (required)"),
+        lineItems: z
+            .array(z.record(z.string(), z.unknown()))
+            .min(1)
+            .describe("At least one line item"),
+        type: z.enum(["invoice", "cashInvoice"]).optional(),
+        customerRef: z
+            .object({ id: z.string().optional(), name: z.string().optional() })
+            .catchall(z.unknown())
+            .optional(),
+        invoiceNumber: z.string().optional(),
+        currency: z.string().optional(),
+        currencyRate: z.number().optional(),
+        dueDate: z.string().optional(),
+    })
+    .catchall(z.unknown());
+
+const itemBody = z
+    .object({
+        description: z.string(),
+        itemType: z.enum(["salesItem", "descriptionOnlyItem"]).optional(),
+        productType: z.enum(["goods", "services"]).optional(),
+        unitType: z.string().optional().describe("e.g. piece, hour, month"),
+        unitPrice: z.number().optional(),
+        taxRate: z.number().optional(),
+        bookkeepingAccountNumber: z.number().int().optional(),
+    })
+    .catchall(z.unknown());
 
 function paging(args: { page?: number; pageSize?: number; query?: string }): Query {
     return { page: args.page, pageSize: args.pageSize ?? 100, query: args.query };
@@ -231,7 +295,7 @@ tool(
 tool(
     "bokio_create_invoice",
     "Create an invoice. Required in body: invoiceDate, lineItems. WRITE.",
-    { companyId, invoice: passthrough },
+    { companyId, invoice: invoiceBody },
     async (a) =>
         ok(
             await bokioRequest({
@@ -245,7 +309,7 @@ tool(
 tool(
     "bokio_update_invoice",
     "Update an invoice. WRITE.",
-    { invoiceId: z.string(), companyId, invoice: passthrough },
+    { invoiceId: z.string(), companyId, invoice: invoiceBody },
     async (a) =>
         ok(
             await bokioRequest({
@@ -335,19 +399,14 @@ tool(
 
 tool(
     "bokio_create_customer",
-    "Create a customer. Required: name, type. WRITE.",
-    {
-        companyId,
-        name: z.string(),
-        type: z.string().describe("e.g. Company or Individual"),
-        extra: passthrough.optional(),
-    },
+    "Create a customer. Required: name, type (company|private). WRITE.",
+    { companyId, customer: customerBody },
     async (a) =>
         ok(
             await bokioRequest({
                 method: "POST",
                 path: `${cbase(a.companyId)}/customers`,
-                body: { name: a.name, type: a.type, ...(a.extra ?? {}) },
+                body: a.customer,
             }),
         ),
 );
@@ -355,7 +414,7 @@ tool(
 tool(
     "bokio_update_customer",
     "Update a customer. WRITE.",
-    { customerId: z.string(), companyId, customer: passthrough },
+    { customerId: z.string(), companyId, customer: customerBody },
     async (a) =>
         ok(
             await bokioRequest({
@@ -376,14 +435,14 @@ tool("bokio_get_item", "Get an item by id.", { itemId: z.string(), companyId }, 
     ok(await bokioRequest({ path: `${cbase(a.companyId)}/items/${a.itemId}` })),
 );
 
-tool("bokio_create_item", "Create an item. WRITE.", { companyId, item: passthrough }, async (a) =>
+tool("bokio_create_item", "Create an item. WRITE.", { companyId, item: itemBody }, async (a) =>
     ok(await bokioRequest({ method: "POST", path: `${cbase(a.companyId)}/items`, body: a.item })),
 );
 
 tool(
     "bokio_update_item",
     "Update an item. WRITE.",
-    { itemId: z.string(), companyId, item: passthrough },
+    { itemId: z.string(), companyId, item: itemBody },
     async (a) =>
         ok(
             await bokioRequest({
