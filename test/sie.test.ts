@@ -4,6 +4,7 @@ import {
     balancesAt,
     duplicates,
     ledger,
+    openItems,
     parseSie,
     profitAndLoss,
     reconcile,
@@ -486,5 +487,107 @@ describe("VAT summary and profit and loss", () => {
     it("p&l ignores balance accounts (Balance accounts are excluded)", () => {
         const p = profitAndLoss([books()], "2026-01-01", "2026-12-31", "account");
         expect(p.rows.every((r) => Number(r.key) >= 3000)).toBe(true);
+    });
+});
+
+describe("open items", () => {
+    const books = (body: string[], head: string[] = []) => [parseSie(sie(body, head))];
+    const post = (n: number, d: string, amt: string) =>
+        ver("V", n, d, `Invoice ${n}`, [[1510, amt]]);
+
+    it("payment settles the earliest posting (Payment settles the earliest open item of equal amount)", () => {
+        const r = openItems(
+            books([
+                ...post(1, "20260110", "500.00"),
+                ...post(2, "20260210", "500.00"),
+                ...ver("V", 3, "20260301", "Paid", [[1510, "-500.00"]]),
+            ]),
+            1510,
+            "2026-03-31",
+        );
+        expect(r.open.map((o) => o.number)).toEqual(["2"]);
+        expect(r.balance).toBe(500);
+    });
+
+    it("open item age (Unsettled items report age at the as-of date)", () => {
+        const r = openItems(books(post(1, "20260301", "200.00")), 1510, "2026-03-31");
+        expect(r.open[0]).toMatchObject({ amount: 200, ageDays: 30 });
+    });
+
+    it("unmatched payment (Unmatched payments are reported separately)", () => {
+        const r = openItems(
+            books([
+                ...post(1, "20260301", "200.00"),
+                ...ver("V", 2, "20260305", "Paid", [[1510, "-150.00"]]),
+            ]),
+            1510,
+            "2026-03-31",
+        );
+        expect(r.open.map((o) => o.number)).toEqual(["1"]);
+        expect(r.unmatchedPayments.map((p) => p.amount)).toEqual([-150]);
+    });
+
+    it("opening balance is unitemised (Items from before the loaded years are an unitemised opening amount)", () => {
+        const r = openItems(
+            books(post(1, "20260301", "200.00"), ["#IB 0 1510 1000.00"]),
+            1510,
+            "2026-03-31",
+        );
+        expect(r.openingUnitemised).toBe(1000);
+        expect(r.balance).toBe(1200);
+    });
+
+    it("lines after asOf ignored (Lines after the as-of date are ignored)", () => {
+        const r = openItems(
+            books([...post(1, "20260301", "200.00"), ...post(2, "20260415", "300.00")]),
+            1510,
+            "2026-03-31",
+        );
+        expect(r.open.map((o) => o.number)).toEqual(["1"]);
+        expect(r.balance).toBe(200);
+    });
+
+    it("annulled postings are not open (Annulled postings are not open items)", () => {
+        const r = openItems(
+            books([
+                ...post(1, "20260301", "200.00"),
+                ...ver("V", 2, "20260301", "Annullering av V1: Invoice 1", [[1510, "-200.00"]]),
+            ]),
+            1510,
+            "2026-03-31",
+        );
+        expect(r.open).toEqual([]);
+        expect(r.unmatchedPayments).toEqual([]);
+        expect(r.balance).toBe(0);
+    });
+
+    it("negative opening keeps postings (Opening balance sign does not flip postings)", () => {
+        const r = openItems(
+            books(
+                [
+                    ...post(1, "20260301", "200.00"),
+                    ...ver("V", 2, "20260310", "Paid", [[1510, "-200.00"]]),
+                ],
+                ["#IB 0 1510 -50.00"],
+            ),
+            1510,
+            "2026-03-31",
+        );
+        expect([r.open, r.unmatchedPayments, r.balance]).toEqual([[], [], -50]);
+    });
+
+    it("credit-side account (2440) treats credits as postings", () => {
+        const r = openItems(
+            [
+                parseSie(
+                    sie(ver("V", 1, "20260301", "Supplier", [[2440, "-80.00"]]), [
+                        "#IB 0 2440 0.00",
+                    ]),
+                ),
+            ],
+            2440,
+            "2026-03-31",
+        );
+        expect(r.open.map((o) => o.amount)).toEqual([-80]);
     });
 });

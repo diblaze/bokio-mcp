@@ -94,7 +94,7 @@ The system SHALL return, per account and sorted by account number, the opening b
 - **THEN** only those accounts are returned, sorted by account number
 
 ### Requirement: Account ledger with running balance
-The system SHALL return the lines of one account between two dates with verification series, number, date, text, amount and running balance, ordered by date, then series, then verification number, then line order; the opening balance is the balance before the first day; a range spanning several fiscal years is continuous; a start date after the end date is rejected.
+The system SHALL return the lines of one account between two dates with verification series, number, date, text, amount and running balance, ordered by date, then series, then verification number, then line order; the opening balance is the balance before the first day; across a fiscal-year boundary the running balance restarts from the new year's opening balance (zero for result accounts); a start date after the end date is rejected.
 
 #### Scenario: Ledger lines carry running balance in deterministic order
 - **GIVEN** two lines on the same account and the same date in different verifications
@@ -104,7 +104,12 @@ The system SHALL return the lines of one account between two dates with verifica
 #### Scenario: Range spanning two fiscal years downloads both
 - **GIVEN** a range that starts in one fiscal year and ends in the next
 - **WHEN** the ledger is requested
-- **THEN** both exports are downloaded and the lines run continuously across the boundary
+- **THEN** both exports are downloaded and the running balance continues from the new year's opening balance after the boundary
+
+#### Scenario: Result account restarts at the new fiscal year
+- **GIVEN** a revenue account with lines in December of one fiscal year and January of the next
+- **WHEN** the ledger is requested across the boundary
+- **THEN** the January running balance starts from zero, not from December's balance
 
 #### Scenario: From after to is rejected
 - **GIVEN** a start date later than the end date
@@ -112,12 +117,12 @@ The system SHALL return the lines of one account between two dates with verifica
 - **THEN** the tool returns an error and no export is downloaded
 
 ### Requirement: Bank reconciliation by exact amount within a day tolerance
-The system SHALL match caller-supplied bank rows (date, amount, text) against ledger lines on one account by exact amount within a day tolerance, each ledger line at most once, and SHALL report matched pairs, unmatched rows on each side, suspected duplicate ledger lines, both totals and the net difference.
+The system SHALL match caller-supplied bank rows (date, amount, text) to ledger lines on one account by exact amount within a day tolerance, each ledger line at most once, taking rows in date order and giving each the earliest unmatched line it can reach.
 
-#### Scenario: Exact amount within tolerance is matched to the closest date
-- **GIVEN** one bank row and two ledger lines of the same amount, one two days away and one five days away, with a tolerance of seven
+#### Scenario: Exact amount within tolerance matches the earliest reachable line
+- **GIVEN** a bank row and two ledger lines of the same amount two and five days after it, a tolerance of seven, and a later bank row of another amount on the fifth day
 - **WHEN** reconciliation runs
-- **THEN** the row matches the line two days away and the other line is unmatched
+- **THEN** the row matches the line two days after it and the other line is unmatched
 
 #### Scenario: Tie on date distance resolves to the earliest ledger line
 - **GIVEN** one bank row and two ledger lines of the same amount, one the day before and one the day after
@@ -129,20 +134,38 @@ The system SHALL match caller-supplied bank rows (date, amount, text) against le
 - **WHEN** reconciliation runs
 - **THEN** one row is matched and the other is reported as unmatched
 
+#### Scenario: Recurring same amount reconciles fully
+- **GIVEN** bank rows of one amount on days 5 and 7, ledger lines of that amount on days 3 and 6, and a tolerance of three
+- **WHEN** reconciliation runs
+- **THEN** both rows are matched and nothing is unmatched on either side
+
+#### Scenario: Invalid dates and sub-öre amounts are rejected
+- **GIVEN** a row dated 2026-02-31 or an amount with three decimals
+- **WHEN** reconciliation is requested
+- **THEN** the tool returns an error and no export is downloaded
+
+#### Scenario: Empty bank rows are rejected
+- **GIVEN** no bank rows
+- **WHEN** reconciliation is requested
+- **THEN** the tool returns an error and no export is downloaded
+
+### Requirement: Reconciliation report covers the statement span
+The system SHALL report matched pairs, unmatched rows on each side, suspected duplicate ledger lines, both totals and the net difference (ledger minus bank), counting ledger lines inside the statement's date span plus lines a row matched.
+
 #### Scenario: Unmatched rows on both sides and net difference are reported
 - **GIVEN** bank rows and ledger lines whose totals differ
 - **WHEN** reconciliation runs
 - **THEN** the unmatched bank rows, the unmatched ledger lines, both totals and the difference (ledger minus bank) are returned
 
 #### Scenario: Suspected duplicate ledger lines are flagged
-- **GIVEN** a matched ledger line and an unmatched ledger line of the same amount within the tolerance
+- **GIVEN** a matched ledger line and an unmatched ledger line of the same amount within the tolerance, both inside the statement span
 - **WHEN** reconciliation runs
 - **THEN** the unmatched line is listed under suspected duplicates
 
-#### Scenario: Empty bank rows are rejected
-- **GIVEN** no bank rows
-- **WHEN** reconciliation is requested
-- **THEN** the tool returns an error and no export is downloaded
+#### Scenario: Lines outside the statement span are not reported
+- **GIVEN** a ledger line inside the tolerance margin but before the first bank row, that no row matches
+- **WHEN** reconciliation runs
+- **THEN** it is neither an unmatched ledger line nor part of the ledger total
 
 ### Requirement: Duplicate detection
 The system SHALL group lines with the same account and amount whose dates fall within a day window into one group when they belong to different verifications, SHALL ignore zero amounts and lines of the same verification, SHALL restrict to one account when asked, and SHALL return groups sorted by account, amount and first date.
@@ -181,7 +204,7 @@ The system SHALL sum, per account over a period, every account in the VAT range 
 - **THEN** output VAT is the negated credit, input VAT is the debit, and net VAT is output minus input
 
 ### Requirement: Open items by exact-amount matching
-The system SHALL, for one account up to an as-of date, pair each payment (opposite-sign line) with the earliest unpaired same-amount posting dated on or before it, SHALL report unpaired postings with their age in days at the as-of date, unpaired payments separately, the account balance, and the opening balance of the oldest loaded fiscal year as an unitemised amount; lines after the as-of date are ignored.
+The system SHALL, for one account up to an as-of date, pair each payment (opposite to the account's normal sign: debit for 1xxx, credit for 2xxx) with the earliest unpaid same-amount posting dated on or before it, and SHALL report unpaid postings with their age, unmatched payments, the balance, and the oldest loaded opening balance as an unitemised amount.
 
 #### Scenario: Payment settles the earliest open item of equal amount
 - **GIVEN** two postings of the same amount on different dates and one payment of that amount
@@ -203,13 +226,18 @@ The system SHALL, for one account up to an as-of date, pair each payment (opposi
 - **WHEN** open items are requested
 - **THEN** that opening balance is returned as the unitemised amount and the balance equals it plus the loaded lines
 
+#### Scenario: Opening balance sign does not flip postings
+- **GIVEN** a receivables account with a negative opening balance (customer credit), an invoice and its payment
+- **WHEN** open items are requested
+- **THEN** the invoice is treated as the posting and the payment settles it
+
 #### Scenario: Lines after the as-of date are ignored
 - **GIVEN** a posting dated after the as-of date
 - **WHEN** open items are requested
 - **THEN** it is absent from open items and from the balance
 
 ### Requirement: Profit and loss per class or account
-The system SHALL sum result accounts (classes 3–8) over a period, grouped by BAS class or by account, with amounts in ledger sign, SHALL return the period result as the negated total (profit positive), and SHALL exclude balance accounts.
+The system SHALL sum result accounts (classes 3–8) over a period, grouped by BAS class or by account, with amounts in ledger sign, leaving out the year-end closing verification (any verification with a line on 2099), SHALL return the period result as the negated total (profit positive), and SHALL exclude balance accounts.
 
 #### Scenario: Result per class covers classes 3 to 8
 - **GIVEN** lines on revenue and cost accounts in the period
@@ -220,6 +248,11 @@ The system SHALL sum result accounts (classes 3–8) over a period, grouped by B
 - **GIVEN** several lines on one result account
 - **WHEN** profit and loss is requested grouped by account
 - **THEN** that account appears once with the summed amount, rows sorted by account number
+
+#### Scenario: Year-end closing verification is left out
+- **GIVEN** a closed year whose closing verification books the year's result to 8999 against 2099
+- **WHEN** profit and loss is requested for that year
+- **THEN** the result is the year's profit, not zero
 
 #### Scenario: Balance accounts are excluded
 - **GIVEN** lines on a bank account and a revenue account in the period

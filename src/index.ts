@@ -23,6 +23,7 @@ import {
     balancesAt,
     duplicates,
     ledger,
+    openItems,
     parseSie,
     profitAndLoss,
     reconcile,
@@ -564,6 +565,31 @@ tool(
         to: z.string(),
         rows: z.array(z.object({ key: z.string(), name: z.string(), amount: z.number() })),
         result: z.number(),
+    },
+);
+
+tool(
+    "bokio_open_items",
+    `Unpaid items on a ledger account (default 1510 receivables; 2440 for supplier debt) at asOf: each payment settles the earliest unpaid posting of the same amount (FIFO, exact öre). Returns open items with age in days, payments that matched nothing, the balance, and the opening balance of the oldest loaded year as an unitemised amount. Loads the year of asOf plus lookbackYears earlier. ${SIGN}`,
+    {
+        companyId,
+        account: z.number().int().default(1510),
+        asOf: isoDay.optional().describe("Defaults to today"),
+        lookbackYears: z.number().int().min(0).max(5).default(1),
+    },
+    async (a) => {
+        const asOf = a.asOf ?? today();
+        const from = `${Number(asOf.slice(0, 4)) - a.lookbackYears}-01-01`;
+        const sies = await loadYears(a.companyId, { from, to: asOf });
+        return okStructured(openItems(sies, a.account, asOf));
+    },
+    {
+        account: z.number(),
+        asOf: z.string(),
+        openingUnitemised: z.number(),
+        open: z.array(lineOut.extend({ ageDays: z.number() })),
+        unmatchedPayments: z.array(lineOut),
+        balance: z.number(),
     },
 );
 

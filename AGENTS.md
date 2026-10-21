@@ -10,7 +10,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 
 | File | Description |
 |------|-------------|
-| `src/index.ts` | Server entry: builds the `McpServer`, registers all 59 tools via the `tool()` helper, gates `main()` on being the entry point. Exports `server` for tests. |
+| `src/index.ts` | Server entry: builds the `McpServer`, registers all 60 tools via the `tool()` helper, gates `main()` on being the entry point. Exports `server` for tests. |
 | `src/sie.ts` | SIE 4 export parser (PC8/CP437, `#RAR 0`, annulment pairs) and the pure öre computations behind the computed tools. |
 | `src/bokio.ts` | HTTP client + config: `bokioRequest` (JSON, enforces the write gate), `bokioDownload` (binary GET), `fileForm`, `filterQuery`, `resolveCompanyId`, `writesAllowed`, `downloadTarget`. |
 | `test/bokio.test.ts` | Unit tests (mocked `fetch`) for the client, write gate, filterQuery, downloadTarget. |
@@ -61,7 +61,7 @@ pnpm test          # vitest: mocked fetch + in-memory server
 pnpm run build
 pnpm run smoke     # spawns dist/index.js, MCP handshake
 ```
-When adding a tool, the `test/server.test.ts` count assertion (`expect(tools.length).toBe(59)`) and the smoke `forbidden`/`required` lists may need updating.
+When adding a tool, the `test/server.test.ts` count assertion (`expect(tools.length).toBe(60)`) and the smoke `forbidden`/`required` lists may need updating.
 
 ### Common Patterns
 

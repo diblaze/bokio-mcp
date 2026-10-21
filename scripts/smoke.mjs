@@ -79,6 +79,9 @@ async function check(cmd) {
         "bokio_list_credit_notes",
         "bokio_list_suppliers",
         "bokio_list_bank_payments",
+        "bokio_account_balances",
+        "bokio_reconcile_bank",
+        "bokio_open_items",
     ];
     const missing = required.filter((n) => !names.includes(n));
     if (missing.length) fail(`missing read tools: ${missing.join(", ")}`);
