@@ -14,7 +14,7 @@ describe("server tool surface", () => {
         await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 
         const { tools } = await client.listTools();
-        expect(tools.length).toBe(53);
+        expect(tools.length).toBe(55);
 
         // #6: every tool declares an explicit readOnlyHint boolean.
         for (const t of tools) {
@@ -371,6 +371,132 @@ describe("path ids", () => {
             });
             expect(res.isError, creditNoteId).toBe(true);
         }
+        expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+});
+
+// ---- computed tools: mocked Bokio with fiscal-year listing + SIE downloads --
+
+const YEARS = [
+    { id: "fy1", startDate: "2025-01-01", endDate: "2025-12-31" },
+    { id: "fy2", startDate: "2026-01-01", endDate: "2026-12-31" },
+];
+
+function sieFor(id: string): string {
+    const y = id === "fy1" ? "2025" : "2026";
+    const body =
+        id === "fy1"
+            ? ['#VER "V" "1" 20251220 "Old" 20251220', "{", "\t#TRANS 1930 {} 100.00", "}"]
+            : ['#VER "V" "1" 20260110 "New" 20260110', "{", "\t#TRANS 1930 {} -30.00", "}"];
+    return [
+        "#FORMAT PC8",
+        `#RAR 0 ${y}0101 ${y}1231`,
+        '#KONTO 1930 "Bank"',
+        // fy2 opens above fy1's closing (100) so a carried balance would show.
+        `#IB 0 1930 ${id === "fy1" ? "0.00" : "150.00"}`,
+        ...body,
+        "",
+    ].join("\r\n");
+}
+
+function mockBokio() {
+    process.env.BOKIO_TOKEN = "a".repeat(40);
+    process.env.BOKIO_COMPANY_ID = "co";
+    const f = vi.fn(async (url: URL | string) => {
+        const u = String(url);
+        if (u.endsWith("/fiscal-years"))
+            return new Response(JSON.stringify({ items: YEARS }), {
+                headers: { "content-type": "application/json" },
+            });
+        const id = /\/sie\/([^/]+)\/download/.exec(u)?.[1] ?? "";
+        return new Response(sieFor(id));
+    });
+    vi.stubGlobal("fetch", f);
+    return f;
+}
+
+const COMPUTED = ["bokio_account_balances", "bokio_account_ledger"];
+
+describe("computed tools", () => {
+    it("computed tools are read-only (Computed tools are listed as read-only)", async () => {
+        const client = await connect();
+        const { tools } = await client.listTools();
+        const hints = new Map(tools.map((t) => [t.name, t.annotations]));
+        for (const n of COMPUTED) expect(hints.get(n)?.readOnlyHint, n).toBe(true);
+        await client.close();
+    });
+
+    it("balances make one listing and one download (One export request per fiscal year)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        const res = await client.callTool({
+            name: "bokio_account_balances",
+            arguments: { date: "2026-06-30", accounts: [1930] },
+        });
+        expect(f.mock.calls.length).toBe(2);
+        expect(String(f.mock.calls[0][0])).toMatch(/\/fiscal-years$/);
+        expect(String(f.mock.calls[1][0])).toMatch(/\/sie\/fy2\/download$/);
+        expect(res.structuredContent).toMatchObject({
+            date: "2026-06-30",
+            balances: [{ account: 1930, opening: 150, movement: -30, balance: 120 }],
+        });
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+
+    it("fiscalYearId skips the listing (Export fetched by fiscal year id without a listing)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        const res = await client.callTool({
+            name: "bokio_account_balances",
+            arguments: { fiscalYearId: "fy1" },
+        });
+        expect(f.mock.calls.length).toBe(1);
+        expect(String(f.mock.calls[0][0])).toMatch(/\/sie\/fy1\/download$/);
+        expect(res.structuredContent).toMatchObject({ date: "2025-12-31" });
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+
+    it("date outside fiscal years errors before download (Date outside every fiscal year is rejected)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        const res = await client.callTool({
+            name: "bokio_account_balances",
+            arguments: { date: "2030-01-01" },
+        });
+        expect(res.isError).toBe(true);
+        expect(JSON.stringify(res.content)).toMatch(/2025-01-01\.\.2025-12-31/);
+        expect(f.mock.calls.length).toBe(1);
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+
+    it("ledger across two fiscal years (Range spanning two fiscal years downloads both)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        const res = await client.callTool({
+            name: "bokio_account_ledger",
+            arguments: { account: 1930, from: "2025-12-01", to: "2026-01-31" },
+        });
+        expect(f.mock.calls.filter((c) => /\/sie\//.test(String(c[0]))).length).toBe(2);
+        const l = res.structuredContent as { opening: number; lines: { balance: number }[] };
+        expect(l.opening).toBe(0);
+        expect(l.lines.map((x) => x.balance)).toEqual([100, 120]);
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+
+    it("ledger rejects from after to (From after to is rejected)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        const res = await client.callTool({
+            name: "bokio_account_ledger",
+            arguments: { account: 1930, from: "2026-02-01", to: "2026-01-01" },
+        });
+        expect(res.isError).toBe(true);
         expect(f).not.toHaveBeenCalled();
         vi.unstubAllGlobals();
         await client.close();

@@ -18,6 +18,7 @@ import {
     tokenWarning,
     writesAllowed,
 } from "./bokio.js";
+import { balancesAt, ledger, parseSie, type Sie } from "./sie.js";
 
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
@@ -317,6 +318,110 @@ tool(
         if (a.savePath) return saveDownload(path, a.savePath);
         const buf = await bokioDownload(path);
         return ok(buf.toString("latin1").slice(0, 4000));
+    },
+);
+
+// ---- computed (read-only, from the SIE export) -----------------------------
+// Arithmetic happens here, in öre, so clients never add up rows themselves.
+
+type FiscalYear = { id: string; startDate: string; endDate: string };
+
+/** Download + parse the SIE export of each fiscal year touching [from, to] (or the given id). */
+async function loadYears(
+    cid: string | undefined,
+    sel: { fiscalYearId?: string; from: string; to: string },
+): Promise<Sie[]> {
+    const base = cbase(cid);
+    let ids: string[];
+    if (sel.fiscalYearId) {
+        ids = [sel.fiscalYearId];
+    } else {
+        const res = await bokioRequest<{ items?: FiscalYear[] } | FiscalYear[]>({
+            path: `${base}/fiscal-years`,
+        });
+        const years = (Array.isArray(res) ? res : (res?.items ?? [])).map((y) => ({
+            id: y.id,
+            from: y.startDate.slice(0, 10),
+            to: y.endDate.slice(0, 10),
+        }));
+        const { from, to } = sel;
+        ids = years.filter((y) => y.from <= to && y.to >= from).map((y) => y.id);
+        if (!ids.length) {
+            const covered = years
+                .map((y) => `${y.from}..${y.to}`)
+                .sort()
+                .join(", ");
+            throw new Error(`no fiscal year covers ${from}..${to}; covered: ${covered || "none"}`);
+        }
+    }
+    const sies: Sie[] = [];
+    for (const id of ids) sies.push(parseSie(await bokioDownload(`${base}/sie/${id}/download`)));
+    return sies.sort((a, b) => a.from.localeCompare(b.from));
+}
+
+const isoDay = z.iso.date(); // YYYY-MM-DD, real calendar dates only
+const today = () => new Date().toISOString().slice(0, 10);
+const SIGN = "Amounts in ledger sign: debit positive, credit negative.";
+
+tool(
+    "bokio_account_balances",
+    `Account balances at a date, computed from the SIE export (opening + movements to the date). ${SIGN} Date defaults to the fiscal year's last day when fiscalYearId is given, else today.`,
+    {
+        companyId,
+        date: isoDay.optional(),
+        fiscalYearId: idParam.optional(),
+        accounts: z.array(z.number().int()).optional().describe("Only these account numbers"),
+    },
+    async (a) => {
+        const sies = await loadYears(a.companyId, {
+            fiscalYearId: a.fiscalYearId,
+            from: a.date ?? today(),
+            to: a.date ?? today(),
+        });
+        const date = a.date ?? (a.fiscalYearId ? sies[0].to : today());
+        return okStructured({ date, balances: balancesAt(sies, date, a.accounts) });
+    },
+    {
+        date: z.string(),
+        balances: z.array(
+            z.object({
+                account: z.number(),
+                name: z.string(),
+                opening: z.number(),
+                movement: z.number(),
+                balance: z.number(),
+            }),
+        ),
+    },
+);
+
+tool(
+    "bokio_account_ledger",
+    `Lines on one account between two dates with running balance, ordered by date, series, number. ${SIGN} Annulled verifications are kept and flagged cancelled.`,
+    { companyId, account: z.number().int(), from: isoDay, to: isoDay },
+    async (a) => {
+        if (a.from > a.to) throw new Error("from is after to");
+        const sies = await loadYears(a.companyId, { from: a.from, to: a.to });
+        return okStructured(ledger(sies, a.account, a.from, a.to));
+    },
+    {
+        account: z.number(),
+        name: z.string(),
+        from: z.string(),
+        to: z.string(),
+        opening: z.number(),
+        closing: z.number(),
+        lines: z.array(
+            z.object({
+                date: z.string(),
+                series: z.string(),
+                number: z.string(),
+                text: z.string(),
+                amount: z.number(),
+                balance: z.number(),
+                cancelled: z.boolean(),
+            }),
+        ),
     },
 );
 

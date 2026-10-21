@@ -91,6 +91,8 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 
 **Bank payments (read-only):** `bokio_list_bank_payments`, `bokio_get_bank_payment`. Bokio only returns payments created by the same integration. Creating payments is deliberately not exposed: they move money once signed with BankID.
 
+**Computed (read-only, from the SIE export):** `bokio_account_balances`, `bokio_account_ledger`. The server downloads the SIE export of each fiscal year involved (one request per year), parses it and does the arithmetic in whole öre, so answers are exact and repeatable. Amounts are in ledger sign: debit positive, credit negative. A verification and its `Annullering av …` reversal cancel out.
+
 **Escape hatch:** `bokio_raw_get` — GET any Bokio path (read-only).
 
 ## Notes
