@@ -33,7 +33,17 @@ import {
 
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
-export const server = new McpServer({ name: "bokio-mcp", version });
+const INSTRUCTIONS = `Bokio accounting API for one company.
+
+Writes: tools that change data exist only when the server runs with BOKIO_ALLOW_WRITES=1. If a write tool is missing, writes are off; say so and never report a booking, invoice or payment as done unless the call succeeded. Every write changes the live books, so confirm it with the user first. Tools marked destructive (publish, record, reverse, delete, bokio_update_supplier_invoice) cannot be undone.
+
+Numbers: for balances, ledgers, VAT, profit and loss, open items, double bookings and bank reconciliation use the computed tools that read the SIE export instead of summing journal entries yourself; they compute in whole öre. Amounts are in ledger sign, debit positive, credit negative, so liabilities, equity and revenue show negative. A verification and its "Annullering av ..." reversal cancel out.
+
+Cost: each computed call lists the fiscal years, then downloads one SIE export per fiscal year it touches. Bokio allows 5,000 requests per company per month and 200 per minute, so ask for the date range you need and reuse results.
+
+Gaps: revenue booked as journal entries does not appear in bokio_list_invoices; use bokio_account_ledger or bokio_open_items. bokio_raw_get reads any other Bokio path.`;
+
+export const server = new McpServer({ name: "bokio-mcp", version }, { instructions: INSTRUCTIONS });
 
 // ---- helpers ---------------------------------------------------------------
 

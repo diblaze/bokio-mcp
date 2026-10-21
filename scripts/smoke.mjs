@@ -64,6 +64,8 @@ async function check(cmd) {
         clientInfo: { name: "smoke", version: "0" },
     });
     if (!init.result) fail(`${cmd}: no initialize result`);
+    if (typeof init.result.instructions !== "string" || !init.result.instructions)
+        fail(`${cmd}: no instructions in initialize result`);
     notify("notifications/initialized", {});
 
     const list = await send(2, "tools/list", {});

@@ -2,12 +2,17 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/).
 
-## 0.3.0 — unreleased
+## 0.4.0 — unreleased
+
+### Added
+- Usage instructions in the MCP initialize response: read-only default and the write gate, confirm destructive tools, prefer the computed tools over summing journal entries, ledger sign, one SIE export per fiscal year per call, `companyId` default.
+
+## 0.3.0 — 2026-10-21
 
 ### Added
 - Computed read-only tools, calculated in code (whole öre) from the SIE export so the client never adds up rows itself: `bokio_account_balances` (balance per account at a date), `bokio_account_ledger` (one account's lines with running balance), `bokio_find_duplicates` (likely double bookings) `bokio_reconcile_bank` (bank statement rows against the ledger by exact amount within a day tolerance), `bokio_vat_summary` (VAT and sales account totals for a period, no tax-return boxes) `bokio_profit_and_loss` (result per BAS class or account) and `bokio_open_items` (unpaid receivables or supplier debt with age, by exact-amount matching on the ledger). Annulled verifications are recognised and net to zero.
 
-## 0.2.0 — unreleased
+## 0.2.0 — not published (shipped in 0.3.0)
 
 ### Added
 - Credit notes: list, get, PDF download, create from an invoice, update, publish, record, delete (drafts).
