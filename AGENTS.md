@@ -4,7 +4,7 @@
 
 ## Purpose
 
-A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transport) that wraps the [Bokio](https://www.bokio.se/) accounting REST API as MCP tools. Single-company, private Bearer-token auth. **Read-only by default** — all mutating tools are hidden and blocked unless `BOKIO_ALLOW_WRITES=1`. Built to drive a Swedish AB's books alongside a YNAB budget. See `README.md` for user-facing install/config.
+A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transport) that wraps the [Bokio](https://www.bokio.se/) accounting REST API as MCP tools. Single-company, private Bearer-token auth. **Read-only by default** — all mutating tools are hidden and blocked unless `BOKIO_ALLOW_WRITES=1`. For small companies and consultants who keep their own books in Bokio; installed by users with `npx -y bokio-mcp`. See `README.md` for user-facing install/config.
 
 ## Key Files
 
@@ -14,7 +14,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `src/bokio.ts` | HTTP client + config: `bokioRequest` (JSON, enforces the write gate), `bokioDownload` (binary GET), `fileForm`, `filterQuery`, `resolveCompanyId`, `writesAllowed`, `downloadTarget`. |
 | `test/bokio.test.ts` | Unit tests (mocked `fetch`) for the client, write gate, filterQuery, downloadTarget. |
 | `test/server.test.ts` | In-memory `Client↔Server` test: asserts all tools register with explicit annotations. |
-| `scripts/smoke.mjs` | Spawns built `dist/index.js`, runs the MCP handshake + `tools/list`, asserts read-only surface (writes hidden, all annotated). Run via `pnpm run smoke`. |
+| `scripts/smoke.mjs` | Spawns built `dist/index.js` directly and through a symlink (as npm installs bins), runs the MCP handshake + `tools/list`, asserts read-only surface (writes hidden, all annotated). Run via `pnpm run smoke`. |
 | `scripts/pack-check.mjs` | `npm pack --dry-run`: tarball holds only `dist/`, README, LICENSE, `package.json`. Run via `pnpm run pack:check` (CI). |
 | `biome.json` | Biome config: 4-space, 100 cols, double quotes, semicolons, organize-imports. |
 | `pnpm-workspace.yaml` | Carries `allowBuilds: esbuild: true` (pnpm 11 needs it for vitest). |
@@ -37,7 +37,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 - **Package manager is pnpm only** (`packageManager: pnpm@11.9.0`), which requires **Node ≥ 22.13**. Never use npm/yarn. `corepack enable` first.
 - **Lint/format is Biome, 4-space.** Run `pnpm run format` (writes) / `pnpm run lint` (checks). CI runs `pnpm exec biome ci` and it must be clean.
 - **`main` is branch-protected**: external changes need a PR with green CI (`build (22)`, `build (24)`) + 1 approval (CODEOWNERS @diblaze). The owner has admin bypass.
-- Do **not** publish to npm without explicit ask (tracked as issue #1).
+- Publishing to npm is an owner step after the release commit lands on `main`; agents never run `npm publish`. Bump `version` in `package.json` only (the server reads it at startup) and add a `CHANGELOG.md` entry.
 - **AGENTS.md ↔ CLAUDE.md:** every `AGENTS.md` has a sibling `CLAUDE.md` containing `@AGENTS.md` (Claude Code auto-loads CLAUDE.md, not AGENTS.md). A pre-commit hook (`.githooks/pre-commit` → `scripts/ensure-claude-imports.mjs`, activated by `pnpm install` via `prepare`) auto-creates+stages the bridge when you add/change an AGENTS.md. Don't hand-delete the CLAUDE.md bridges.
 
 ### Adding or changing a tool
