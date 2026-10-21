@@ -15,14 +15,12 @@ describe("filterQuery", () => {
     });
 
     it("builds date bounds", () => {
-        expect(filterQuery("2026-07-01", "2026-07-31")).toBe(
-            "date>=2026-07-01 and date<=2026-07-31",
-        );
+        expect(filterQuery("2026-07-01", "2026-07-31")).toBe("date>=2026-07-01&&date<=2026-07-31");
     });
 
-    it("keeps a raw filter and appends bounds in order", () => {
+    it("keeps a raw filter and appends bounds in order (Date bounds joined with &&)", () => {
         expect(filterQuery("2026-07-01", undefined, "title=rent")).toBe(
-            "title=rent and date>=2026-07-01",
+            "title=rent&&date>=2026-07-01",
         );
         expect(filterQuery(undefined, undefined, "title=rent")).toBe("title=rent");
     });
@@ -44,10 +42,12 @@ describe("error UX + token validation", () => {
         expect(tokenWarning()).toBeNull();
     });
 
-    it("maps 401/404/429 to actionable hints", async () => {
-        process.env.BOKIO_TOKEN = "a".repeat(40);
+    it("maps 401/403/404/429 to actionable hints (401, 403 and 429 hints name the documented causes)", async () => {
+        const token = "a".repeat(40);
+        process.env.BOKIO_TOKEN = token;
         for (const [status, re] of [
-            [401, /auth failed/],
+            [401, /Integrations/],
+            [403, /quota/],
             [404, /verify the id/],
             [429, /rate limited/],
         ] as const) {
@@ -55,7 +55,9 @@ describe("error UX + token validation", () => {
                 "fetch",
                 vi.fn(async () => new Response("x", { status })),
             );
-            await expect(bokioRequest({ path: "/x" })).rejects.toThrow(re);
+            const err = await bokioRequest({ path: "/x" }).catch((e: Error) => e);
+            expect((err as Error).message).toMatch(re);
+            expect((err as Error).message).not.toMatch(token);
         }
     });
 });
@@ -156,7 +158,7 @@ describe("bokioRequest", () => {
         await expect(bokioRequest({ path: "/missing" })).rejects.toThrow(/404/);
     });
 
-    it("blocks writes unless BOKIO_ALLOW_WRITES is set", async () => {
+    it("blocks writes unless BOKIO_ALLOW_WRITES is set (Write request blocked at the client when gate off)", async () => {
         delete process.env.BOKIO_ALLOW_WRITES;
         const f = mockFetch(200, {});
         vi.stubGlobal("fetch", f);

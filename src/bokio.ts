@@ -4,6 +4,8 @@ import { basename, resolve, sep } from "node:path";
 const DEFAULT_BASE = "https://api.bokio.se/v1";
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const REQUEST_TIMEOUT_MS = 30_000;
+const TOKEN_HELP =
+    "Bokio → Integrations (https://app.bokio.se/integrations) → Create integration → copy token";
 
 /**
  * Resolve a local download path. When BOKIO_DOWNLOAD_DIR is set, confine the
@@ -27,13 +29,13 @@ function baseUrl(): string {
     return (process.env.BOKIO_BASE_URL ?? DEFAULT_BASE).replace(/\/+$/, "");
 }
 
-/** Join a raw filter with optional date bounds into a Bokio query string. */
+/** Join a raw filter with optional date bounds into a Bokio query string (`&&` = AND). */
 export function filterQuery(from?: string, to?: string, raw?: string): string | undefined {
     const parts: string[] = [];
     if (raw) parts.push(raw);
     if (from) parts.push(`date>=${from}`);
     if (to) parts.push(`date<=${to}`);
-    return parts.length ? parts.join(" and ") : undefined;
+    return parts.length ? parts.join("&&") : undefined;
 }
 
 export function writesAllowed(): boolean {
@@ -52,7 +54,7 @@ export function resolveCompanyId(companyId?: string): string {
 function token(): string {
     const t = process.env.BOKIO_TOKEN;
     if (!t) {
-        throw new Error("BOKIO_TOKEN not set (Bokio -> Installningar -> API Tokens)");
+        throw new Error(`BOKIO_TOKEN not set (${TOKEN_HELP})`);
     }
     return t;
 }
@@ -81,13 +83,13 @@ function buildUrl(path: string, query?: Query): URL {
 function statusHint(status: number): string {
     switch (status) {
         case 401:
-            return " — auth failed; check BOKIO_TOKEN (Bokio → Inställningar → API Tokens)";
+            return ` — auth failed; check BOKIO_TOKEN (${TOKEN_HELP})`;
         case 403:
-            return " — token lacks permission for this resource";
+            return " — token lacks the scope for this resource, or the monthly quota (5,000 requests per company) is used up";
         case 404:
             return " — not found; verify the id (list the collection first)";
         case 429:
-            return " — rate limited (Bokio free tier: 5000 requests/month)";
+            return " — rate limited (200 requests per 60 s) or a concurrent write; wait, then retry";
         default:
             return status >= 500 ? " — Bokio server error; retry later" : "";
     }
@@ -100,7 +102,7 @@ function statusHint(status: number): string {
 export function tokenWarning(): string | null {
     const t = process.env.BOKIO_TOKEN;
     if (!t) {
-        return "BOKIO_TOKEN is not set — tool calls will fail (Bokio → Inställningar → API Tokens).";
+        return `BOKIO_TOKEN is not set — tool calls will fail (${TOKEN_HELP}).`;
     }
     if (t.trim() !== t || t.length < 20) {
         return "BOKIO_TOKEN looks malformed (too short or surrounded by whitespace).";

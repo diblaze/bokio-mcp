@@ -32,18 +32,20 @@ function ok(data: unknown): Result {
 }
 
 // #4: text + structuredContent, so clients get typed data alongside the JSON text.
-// Only attaches structuredContent for plain objects (MCP requires an object).
+// Tools with an outputSchema must always return an object, or the SDK raises a
+// protocol error: wrap a bare array as items, and fall back to {} for anything else.
 function okStructured(data: unknown): Result {
     const r = ok(data);
-    if (data && typeof data === "object" && !Array.isArray(data)) {
+    if (Array.isArray(data)) r.structuredContent = { items: data };
+    else if (data && typeof data === "object")
         r.structuredContent = data as Record<string, unknown>;
-    }
+    else r.structuredContent = {};
     return r;
 }
 
 // Permissive paginated envelope shared by Bokio list endpoints.
 const listOutput: ZodRawShape = {
-    items: z.array(z.record(z.string(), z.unknown())).optional(),
+    items: z.array(z.unknown()).optional(),
     totalItems: z.number().optional(),
     totalPages: z.number().optional(),
     currentPage: z.number().optional(),
@@ -89,11 +91,19 @@ const companyId = z
     .optional()
     .describe("Bokio company id. Defaults to BOKIO_COMPANY_ID if omitted.");
 const page = z.number().int().positive().optional().describe("Page number (1-based)");
-const pageSize = z.number().int().positive().max(200).optional().describe("Items per page");
+const pageSize = z
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .describe("Items per page (max 100)");
 const query = z
     .string()
     .optional()
-    .describe('Bokio filter query, e.g. "date>=2026-07-01 and date<=2026-07-31"');
+    .describe(
+        'Bokio filter query; combine conditions with &&, e.g. "date>=2026-07-01&&date<=2026-07-31"',
+    );
 // Typed write-body schemas (modelled from the Bokio OpenAPI). `.catchall` keeps
 // any unmodelled/nested fields while still validating the documented ones.
 const addressSchema = z
@@ -193,12 +203,12 @@ tool(
 tool(
     "bokio_chart_of_accounts",
     "Get the chart of accounts (BAS).",
-    { companyId, page, pageSize },
+    { companyId, query },
     async (a) =>
         ok(
             await bokioRequest({
                 path: `${cbase(a.companyId)}/chart-of-accounts`,
-                query: paging(a),
+                query: { query: a.query },
             }),
         ),
 );
@@ -466,7 +476,7 @@ tool(
 tool(
     "bokio_list_items",
     "List items (articles).",
-    { companyId, page, pageSize },
+    { companyId, page, pageSize, query },
     async (a) =>
         okStructured(await bokioRequest({ path: `${cbase(a.companyId)}/items`, query: paging(a) })),
     listOutput,
@@ -499,7 +509,7 @@ tool(
 tool(
     "bokio_list_uploads",
     "List uploaded files / receipts.",
-    { companyId, page, pageSize },
+    { companyId, page, pageSize, query },
     async (a) =>
         okStructured(
             await bokioRequest({ path: `${cbase(a.companyId)}/uploads`, query: paging(a) }),
@@ -553,7 +563,7 @@ tool(
     "bokio_raw_get",
     "GET an arbitrary Bokio API path (read-only escape hatch). {companyId} is substituted.",
     {
-        path: z.string().describe("e.g. /companies/{companyId}/credit-notes"),
+        path: z.string().describe("e.g. /companies/{companyId}/tag-groups"),
         companyId,
         params: z
             .record(z.string(), z.union([z.string(), z.number()]))

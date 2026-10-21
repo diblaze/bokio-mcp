@@ -48,6 +48,22 @@ describe("server tool surface", () => {
         );
         const listed = await client.callTool({ name: "bokio_list_invoices", arguments: {} });
         expect((listed.structuredContent as { items?: unknown[] })?.items?.length).toBe(1);
+
+        // Envelope drift (bare array, non-JSON body) stays data, not a protocol error.
+        for (const [body, type] of [
+            ["[1,2]", "application/json"],
+            ["oops", "text/plain"],
+        ]) {
+            vi.stubGlobal(
+                "fetch",
+                vi.fn(async () => new Response(body, { headers: { "content-type": type } })),
+            );
+            const res = await client.callTool({ name: "bokio_list_invoices", arguments: {} });
+            expect(res.isError).toBeFalsy();
+            expect((res.content as { text: string }[])[0].text).toContain(
+                body === "oops" ? "oops" : "1",
+            );
+        }
         vi.unstubAllGlobals();
 
         // #5: reference data exposed as MCP resources.
@@ -75,5 +91,25 @@ describe("write-body schemas (#2)", () => {
         expect(customerBody.safeParse({ name: "A" }).success).toBe(false); // missing type
         expect(customerBody.safeParse({ name: "A", type: "company" }).success).toBe(true);
         expect(customerBody.safeParse({ name: "A", type: "bogus" }).success).toBe(false); // enum
+    });
+});
+
+describe("input bounds", () => {
+    it("rejects pageSize above 100 without a request (pageSize above 100 is rejected before any request)", async () => {
+        const { server } = await import("../src/index.js");
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        const client = new Client({ name: "test", version: "0" });
+        await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        const f = vi.fn(async () => new Response("{}"));
+        vi.stubGlobal("fetch", f);
+        const res = await client
+            .callTool({ name: "bokio_list_invoices", arguments: { pageSize: 101 } })
+            .catch(() => ({ isError: true }));
+        expect(res.isError).toBe(true);
+        expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        await client.close();
     });
 });
