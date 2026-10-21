@@ -22,6 +22,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `pnpm-workspace.yaml` | Carries `allowBuilds`: `esbuild: true` (pnpm 11 needs it for vitest), `lefthook: false` (hooks come from `prepare`). |
 | `LLM.md` | Setup guide addressed to an AI agent; linked from the README, not shipped in the tarball. |
 | `lefthook.yml` | Git hooks, installed by `pnpm install` (`prepare: lefthook install --reset-hooks-path`, which also clears an old `core.hooksPath`): pre-commit Biome on staged files + actionlint on staged workflows (skipped when not on PATH), commit-msg commitlint (Conventional Commits, built-in config). |
+| `.github/workflows/release-please.yml` | On push to `main`: release-please opens or updates the release PR; when a release is created, the `publish` job runs `npm stage publish` (OIDC, Node 24). Needs the `RELEASE_PLEASE_TOKEN` secret. |
+| `release-please-config.json`, `.release-please-manifest.json` | release-please config (node, `bump-minor-pre-major`, `v`-prefixed tags, changelog sections Added/Fixed/Changed) and the last released version. |
 | `.github/workflows/ci.yml` | CI: Node matrix [22, 24], pnpm, commitlint over the PR's commits → actionlint (+ shellcheck) → `biome ci` → typecheck → test → build → smoke → pack:check. |
 | `.github/CODEOWNERS` | `* @diblaze` — required reviewer on PRs. |
 
@@ -36,7 +38,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 
 ## Coding standard
 - Stack: TypeScript 5 (ESM; runtime Node ≥ 22, development ≥ 22.13 for pnpm 11) — MCP SDK ^1.29, Context7 `/modelcontextprotocol/typescript-sdk` (version `v1.29.0`); zod ^4, Context7 `/colinhacks/zod`. Bokio API: OpenAPI `bokio/bokio-api` branch `v1`, `api-specification/company-api.yaml`.
-- Package manager: pnpm (lockfile `pnpm-lock.yaml`). Never npm/yarn (npm only for the owner's `npm publish`).
+- Package manager: pnpm (lockfile `pnpm-lock.yaml`). Never npm/yarn (npm only in the release workflow's publish job).
 - Check: `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check` — green before commit. CI: `.github/workflows/ci.yml` (Node 22 + 24) also runs commitlint over the PR's commits and actionlint (locally: `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.12`).
 - Format/lint: Biome, `biome.json` is law. Run `pnpm run format` before commit (the pre-commit hook fixes staged files).
 - Commits: Conventional Commits (`@commitlint/config-conventional` as-is), enforced by the commit-msg hook and in CI for every commit in a PR.
@@ -53,7 +55,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 - **Package manager is pnpm only** (`packageManager: pnpm@11.9.0`), which requires **Node ≥ 22.13** to develop (users only need Node ≥ 22). Never use npm/yarn. `corepack enable` first.
 - **Lint/format is Biome, 4-space.** Run `pnpm run format` (writes) / `pnpm run lint` (checks). CI runs `pnpm exec biome ci` and it must be clean.
 - **`main` is branch-protected**: external changes need a PR with green CI (`build (22)`, `build (24)`) + 1 approval (CODEOWNERS @diblaze). The owner has admin bypass.
-- Publishing to npm is an owner step after the release commit lands on `main`; agents never run `npm publish`. Bump `version` in `package.json` only (the server reads it at startup) and add a `CHANGELOG.md` entry.
+- Releases: release-please (`.github/workflows/release-please.yml`) keeps a release PR open on every push to `main`, with the next version and `CHANGELOG.md` entry derived from the commit types (`feat` → minor before 1.0, `fix` → patch; other types never release on their own). Merging it tags `vX.Y.Z`, creates the GitHub Release and stages the package on npm via trusted publishing; the owner approves the staged version on npm with 2FA. Never bump `version` or edit `CHANGELOG.md` by hand, and agents never run `npm publish`.
 
 ### Adding or changing a tool
 

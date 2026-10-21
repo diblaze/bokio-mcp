@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+# One release run at a time, so two quick pushes cannot tag or publish the same version twice.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    # The action authenticates with the PAT below; the job's GITHUB_TOKEN needs nothing.
+    permissions: {}
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          # A PAT, so the release PR triggers CI like any other PR.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      # Node 24 ships npm 11, which has `npm stage`.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          # No dependency cache in a job that can publish (cache poisoning).
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run build
+
+      # Trusted publishing (OIDC): no token. The owner approves the staged version on npm with 2FA.
+      - run: npm stage publish

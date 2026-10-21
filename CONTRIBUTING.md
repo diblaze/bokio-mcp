@@ -30,3 +30,7 @@ Adding a tool: follow the existing `tool()` pattern in `src/index.ts`, put `WRIT
 Never put real accounting data, company ids, org numbers or tokens in code, tests or issues.
 
 Toolchain: TypeScript + pnpm, [Biome](https://biomejs.dev) for lint/format, [Vitest](https://vitest.dev) for tests.
+
+## Releases
+
+Commit types decide the next version: `feat` gives a minor bump (while the version is below 1.0), `fix` a patch, `perf` is listed under Changed, and other types (`docs`, `chore`, `ci`, `build`, `test`) neither trigger a release nor appear in the changelog. release-please keeps a release PR open with the version and changelog. When a maintainer merges it, the release is tagged, a GitHub Release is created and the package is staged on npm, where the owner approves it. Do not edit `version` or `CHANGELOG.md` in a PR.

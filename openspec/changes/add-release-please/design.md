@@ -71,3 +71,4 @@
 
 ## Decisions (owner, 2026-10-21)
 - Q1 release-please. Q2 fine-grained PAT as `RELEASE_PLEASE_TOKEN`. Q3 trusted publisher, stage-only, `npm stage publish`, owner approves with 2FA. Q4 delete the hand block, regenerate. Q5 Added/Fixed/Changed; Documentation dropped after review (docs would make every spec fold a release).
+- Verified before the PR (2026-10-21): `npx release-please@17 release-pr --dry-run --repo-url diblaze/bokio-mcp --target-branch feat/add-release-please` found tag `v0.3.0` via the tag fallback, proposed 0.4.0 with one Added entry (`server: send usage instructions at initialize`) and listed no docs/ci/build commits.
