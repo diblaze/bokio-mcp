@@ -25,6 +25,8 @@ You need three things:
 
 The server runs straight from npm, with no clone needed. It speaks MCP over stdio, so your MCP client starts it for you.
 
+Using an AI agent? Paste https://raw.githubusercontent.com/diblaze/bokio-mcp/main/LLM.md into it and ask it to install bokio-mcp.
+
 ### Claude Code
 
 ```bash
@@ -64,7 +66,7 @@ Keep the token out of files you commit or share. Clients that support it, such a
 | `BOKIO_TOKEN` | yes, when a tool is called | Private Bearer token |
 | `BOKIO_COMPANY_ID` | default company | Used when a tool call leaves out `companyId` |
 | `BOKIO_ALLOW_WRITES` | no | `1`, `true`, `yes` or `on` enables write tools; anything else keeps them hidden and blocked |
-| `BOKIO_DOWNLOAD_DIR` | recommended | Where SIE, PDF and upload downloads are saved. Without it, downloads go to the server's working directory, which for Claude Desktop is often `/`. Paths outside the directory are rejected and existing files are never overwritten |
+| `BOKIO_DOWNLOAD_DIR` | recommended | Where SIE, PDF and upload downloads are saved. Without it, downloads go to the server's working directory, and they are rejected when that is `/`, as it often is for Claude Desktop. Paths outside the directory are rejected and existing files are never overwritten |
 | `BOKIO_BASE_URL` | no | Defaults to `https://api.bokio.se/v1` |
 
 ## Reading and writing
