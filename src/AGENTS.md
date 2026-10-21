@@ -11,7 +11,7 @@ The server implementation: a thin, convention-driven MCP wrapper over the Bokio 
 
 | File | Description |
 |------|-------------|
-| `index.ts` | Creates and **exports** `server` (`McpServer`). Defines the `tool()` helper that registers each tool with derived annotations + read-only gating. Registers all 31 tools. `main()` opens stdio only when run as the entry point (`process.argv[1] === fileURLToPath(import.meta.url)`), so importing for tests does not connect. |
+| `index.ts` | Creates and **exports** `server` (`McpServer`). Defines the `tool()` helper that registers each tool with derived annotations + read-only gating. Registers all 53 tools. `main()` opens stdio only when run as the entry point (`process.argv[1] === fileURLToPath(import.meta.url)`), so importing for tests does not connect. |
 | `bokio.ts` | `bokioRequest<T>` (JSON; enforces the write gate at the single choke point), `bokioDownload` (binary GET), `fileForm` (multipart upload), `filterQuery` (journal date-filter join, unit-tested), `downloadTarget` (path confinement), `resolveCompanyId`, `writesAllowed`, `baseUrl`. 30s `AbortSignal.timeout` on every request. |
 
 ## For AI Agents

@@ -70,12 +70,22 @@ try {
         "bokio_list_journal_entries",
         "bokio_download_sie",
         "bokio_list_invoices",
+        "bokio_list_credit_notes",
+        "bokio_list_suppliers",
+        "bokio_list_bank_payments",
     ];
     const missing = required.filter((n) => !names.includes(n));
     if (missing.length) fail(`missing read tools: ${missing.join(", ")}`);
 
     // Write tools must NOT be registered when writes are disabled (#3).
-    const forbidden = ["bokio_create_journal_entry", "bokio_upload_file", "bokio_delete_invoice"];
+    const forbidden = [
+        "bokio_create_journal_entry",
+        "bokio_upload_file",
+        "bokio_delete_invoice",
+        "bokio_create_credit_note",
+        "bokio_create_supplier_invoice",
+        "bokio_create_bank_payment",
+    ];
     const leaked = forbidden.filter((n) => names.includes(n));
     if (leaked.length) fail(`write tools registered in read-only mode: ${leaked.join(", ")}`);
 

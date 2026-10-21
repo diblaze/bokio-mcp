@@ -14,7 +14,7 @@ describe("server tool surface", () => {
         await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 
         const { tools } = await client.listTools();
-        expect(tools.length).toBe(51);
+        expect(tools.length).toBe(53);
 
         // #6: every tool declares an explicit readOnlyHint boolean.
         for (const t of tools) {
@@ -329,6 +329,20 @@ describe("supplier invoice update", () => {
         ]) {
             expect(tools.find((t) => t.name === n)?.annotations?.destructiveHint, n).toBe(true);
         }
+        await client.close();
+    });
+});
+
+describe("bank payments", () => {
+    it("bank payment tools are read-only and none creates (No bank payment creation tool exists)", async () => {
+        const client = await connect();
+        const { tools } = await client.listTools();
+        const bank = tools.filter((t) => t.name.includes("bank_payment"));
+        expect(bank.length).toBeGreaterThan(0);
+        for (const t of bank) expect(t.annotations?.readOnlyHint).toBe(true);
+        expect(tools.some((t) => /create.*bank_payment|bank_payment.*bulk/.test(t.name))).toBe(
+            false,
+        );
         await client.close();
     });
 });

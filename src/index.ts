@@ -758,6 +758,28 @@ tool(
         ),
 );
 
+// ---- bank payments (read-only by design) -----------------------------------
+// Creating a bank payment moves money after BankID signing; it is deliberately not exposed.
+
+tool(
+    "bokio_list_bank_payments",
+    "List bank payments. Bokio returns only payments created by this integration; creation is deliberately not exposed.",
+    { companyId, page, pageSize, query },
+    async (a) =>
+        okStructured(
+            await bokioRequest({ path: `${cbase(a.companyId)}/bank-payments`, query: paging(a) }),
+        ),
+    listOutput,
+);
+
+tool(
+    "bokio_get_bank_payment",
+    "Get a bank payment by id (only payments created by this integration; creation is deliberately not exposed).",
+    { bankPaymentId: z.string(), companyId },
+    async (a) =>
+        ok(await bokioRequest({ path: `${cbase(a.companyId)}/bank-payments/${a.bankPaymentId}` })),
+);
+
 // ---- customers -------------------------------------------------------------
 
 tool(
