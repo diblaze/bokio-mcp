@@ -15,9 +15,10 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `test/bokio.test.ts` | Unit tests (mocked `fetch`) for the client, write gate, filterQuery, downloadTarget. |
 | `test/server.test.ts` | In-memory `Client↔Server` test: asserts all tools register with explicit annotations. |
 | `scripts/smoke.mjs` | Spawns built `dist/index.js`, runs the MCP handshake + `tools/list`, asserts read-only surface (writes hidden, all annotated). Run via `pnpm run smoke`. |
+| `scripts/pack-check.mjs` | `npm pack --dry-run`: tarball holds only `dist/`, README, LICENSE, `package.json`. Run via `pnpm run pack:check` (CI). |
 | `biome.json` | Biome config: 4-space, 100 cols, double quotes, semicolons, organize-imports. |
 | `pnpm-workspace.yaml` | Carries `allowBuilds: esbuild: true` (pnpm 11 needs it for vitest). |
-| `.github/workflows/ci.yml` | CI: Node matrix [22, 24], pnpm, `biome ci` → typecheck → test → build → smoke. |
+| `.github/workflows/ci.yml` | CI: Node matrix [22, 24], pnpm, `biome ci` → typecheck → test → build → smoke → pack:check. |
 | `.github/CODEOWNERS` | `* @diblaze` — required reviewer on PRs. |
 
 ## Subdirectories
@@ -26,7 +27,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 |-----------|---------|
 | `src/` | Server + HTTP client (see `src/AGENTS.md`) |
 | `test/` | Vitest suites (see `test/AGENTS.md`) |
-| `scripts/` | `smoke.mjs` MCP-handshake check (single file) |
+| `scripts/` | `smoke.mjs` MCP-handshake check, `pack-check.mjs` tarball contents check |
 | `.github/` | CI workflow + CODEOWNERS |
 
 ## For AI Agents

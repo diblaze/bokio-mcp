@@ -1,6 +1,6 @@
 {
   "name": "bokio-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Model Context Protocol server for the Bokio accounting API (private Bearer-token auth, single-company)",
   "type": "module",
   "bin": {
@@ -15,7 +15,7 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -23,7 +23,8 @@
     "prepublishOnly": "npm run build",
     "lint": "biome check",
     "format": "biome check --write",
-    "prepare": "git config core.hooksPath .githooks"
+    "prepare": "git config core.hooksPath .githooks",
+    "pack:check": "node scripts/pack-check.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -37,6 +38,14 @@
     "vitest": "^2.1.0"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diblaze/bokio-mcp.git"
+  },
+  "homepage": "https://github.com/diblaze/bokio-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/diblaze/bokio-mcp/issues"
+  },
   "keywords": [
     "mcp",
     "bokio",

@@ -346,3 +346,13 @@ describe("bank payments", () => {
         await client.close();
     });
 });
+
+describe("distribution", () => {
+    it("server version equals package version (Server version equals package version)", async () => {
+        const { readFileSync } = await import("node:fs");
+        const client = await connect();
+        const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+        expect(client.getServerVersion()?.version).toBe(pkg.version);
+        await client.close();
+    });
+});

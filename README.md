@@ -8,38 +8,45 @@ Model Context Protocol server for the [Bokio](https://www.bokio.se/) accounting 
 - **Scope:** journal entries, invoices, customers, items, uploads, chart of accounts, fiscal years, SIE export.
 - **Safety:** all write operations are blocked unless `BOKIO_ALLOW_WRITES=1`.
 
-Built for driving a Swedish AB's books alongside a YNAB budget. Read-only by default so it is safe to point at live accounting data.
+For small companies and consultants who keep their own books in Bokio. Read-only by default, so it is safe to point at live accounting data.
 
 ## Prerequisites
 
 1. A Bokio private integration token: **Bokio → [Integrations](https://app.bokio.se/integrations) → Create integration → copy token**. Limits: 5,000 requests per company per month, 200 per minute.
 2. Your company id — copy it from the Bokio browser URL (`.../companies/<companyId>/...`).
-3. Node.js ≥ 22.13 and [pnpm](https://pnpm.io) (`corepack enable`).
+3. Node.js ≥ 22.
 
-## Install & build (local)
+## Quick start
+
+The server runs straight from npm, no clone needed:
 
 ```bash
-git clone https://github.com/diblaze/bokio-mcp.git ~/git/bokio-mcp
-cd ~/git/bokio-mcp
-pnpm install
-pnpm run build     # → dist/
-pnpm test          # mocked unit tests
-pnpm run smoke     # MCP handshake, asserts tools register
-pnpm run lint      # biome check (lint + format)
+npx -y bokio-mcp
 ```
 
-## Configure in Claude Code
+It speaks MCP over stdio, so you normally let your MCP client start it.
 
-Add to `~/.claude.json` under `mcpServers` (or use `claude mcp add`):
+### Claude Code
+
+```bash
+claude mcp add --transport stdio --scope user \
+  --env BOKIO_TOKEN=your_token \
+  --env BOKIO_COMPANY_ID=your_company_id \
+  bokio -- npx -y bokio-mcp
+```
+
+### Claude Desktop and other MCP clients
+
+Add to the client's `mcpServers` config (Claude Desktop: `claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "bokio": {
-      "command": "node",
-      "args": ["/home/denis/git/bokio-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "bokio-mcp"],
       "env": {
-        "BOKIO_TOKEN": "${BOKIO_TOKEN}",
+        "BOKIO_TOKEN": "your_token",
         "BOKIO_COMPANY_ID": "your_company_id",
         "BOKIO_ALLOW_WRITES": ""
       }
@@ -48,9 +55,9 @@ Add to `~/.claude.json` under `mcpServers` (or use `claude mcp add`):
 }
 ```
 
-Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you intend to mutate the books.
+Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you intend to change the books.
 
-> Do not hardcode the token in a committed file. Use `${BOKIO_TOKEN}` env expansion, matching how the YNAB MCP token is handled.
+> Keep the token out of files you commit or share. Clients that support it (such as Claude Code) can expand `${BOKIO_TOKEN}` from your shell environment instead.
 
 ## Environment
 

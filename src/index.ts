@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -17,7 +18,9 @@ import {
     writesAllowed,
 } from "./bokio.js";
 
-export const server = new McpServer({ name: "bokio-mcp", version: "0.1.0" });
+const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
+
+export const server = new McpServer({ name: "bokio-mcp", version });
 
 // ---- helpers ---------------------------------------------------------------
 
@@ -982,7 +985,16 @@ async function main(): Promise<void> {
 }
 
 // Only open stdio when run as the entry point; importing (e.g. in tests) must not connect.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// realpath: npm/npx start the bin through a symlink in node_modules/.bin.
+function isEntryPoint(): boolean {
+    try {
+        return realpathSync(process.argv[1] ?? "") === fileURLToPath(import.meta.url);
+    } catch {
+        return false; // argv[1] is not a file (e.g. `node -e`, stdin): imported, not run
+    }
+}
+
+if (isEntryPoint()) {
     main().catch((err) => {
         process.stderr.write(`fatal: ${(err as Error).message}\n`);
         process.exit(1);
