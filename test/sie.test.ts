@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { balancesAt, ledger, parseSie, toOre } from "../src/sie.js";
+import {
+    allLines,
+    balancesAt,
+    duplicates,
+    ledger,
+    parseSie,
+    reconcile,
+    toOre,
+} from "../src/sie.js";
 
 // Synthetic export mirroring Bokio's layout: CRLF, PC8, several #RAR years,
 // #TRANS lines without date or text (they take the #VER's). Invented data only.
@@ -218,5 +226,165 @@ describe("balances and ledger", () => {
             ["V", "12", 86],
         ]);
         expect(l.closing).toBe(86);
+    });
+});
+
+describe("duplicates", () => {
+    const dup = (body: string[]) =>
+        duplicates([parseSie(sie(body))], "2026-01-01", "2026-12-31", 7);
+
+    it("groups same amount within window (Same amount on the same account within the window is grouped)", () => {
+        const g = dup([
+            ...ver("V", 1, "20260301", "Fee", [[1930, "-99.00"]]),
+            ...ver("V", 2, "20260304", "Fee", [[1930, "-99.00"]]),
+        ]);
+        expect(g).toEqual([
+            {
+                account: 1930,
+                amount: -99,
+                lines: [
+                    { date: "2026-03-01", series: "V", number: "1", text: "Fee" },
+                    { date: "2026-03-04", series: "V", number: "2", text: "Fee" },
+                ],
+            },
+        ]);
+    });
+
+    it("one verification is not its own duplicate (Lines of one verification are not duplicates of each other)", () => {
+        expect(
+            dup(
+                ver("V", 1, "20260301", "Split", [
+                    [1930, "-50.00"],
+                    [1930, "-50.00"],
+                ]),
+            ),
+        ).toEqual([]);
+    });
+
+    it("equal amounts outside the window (Equal amounts outside the window are not grouped)", () => {
+        expect(
+            dup([
+                ...ver("V", 1, "20260301", "Rent", [[1930, "-500.00"]]),
+                ...ver("V", 2, "20260331", "Rent", [[1930, "-500.00"]]),
+            ]),
+        ).toEqual([]);
+    });
+});
+
+describe("bank reconciliation", () => {
+    const book = (body: string[]) =>
+        allLines([parseSie(sie(body))]).filter((l) => l.account === 1930 && !l.cancelled);
+    const row = (date: string, amount: number, text = "") => ({ date, amount, text });
+
+    it("reconcile takes the earliest reachable line (Exact amount within tolerance matches the earliest reachable line)", () => {
+        const r = reconcile(
+            book([
+                ...ver("V", 1, "20260312", "Far", [[1930, "-10.00"]]),
+                ...ver("V", 2, "20260309", "Near", [[1930, "-10.00"]]),
+            ]),
+            [row("2026-03-07", -10), row("2026-03-12", 99)],
+            7,
+        );
+        expect(r.matched.map((m) => [m.ledger.number, m.dayDiff])).toEqual([["2", 2]]);
+        expect(r.unmatchedLedger.map((l) => l.number)).toEqual(["1"]);
+    });
+
+    it("reconcile tie goes to the earlier line (Tie on date distance resolves to the earliest ledger line)", () => {
+        const r = reconcile(
+            book([
+                ...ver("V", 1, "20260311", "After", [[1930, "-10.00"]]),
+                ...ver("V", 2, "20260309", "Before", [[1930, "-10.00"]]),
+            ]),
+            [row("2026-03-10", -10)],
+            3,
+        );
+        expect(r.matched[0].ledger.date).toBe("2026-03-09");
+    });
+
+    it("reconcile matches a ledger line once (A ledger line is matched at most once)", () => {
+        const r = reconcile(
+            book(ver("V", 1, "20260310", "One", [[1930, "-10.00"]])),
+            [row("2026-03-10", -10, "a"), row("2026-03-10", -10, "b")],
+            3,
+        );
+        expect(r.matched).toHaveLength(1);
+        expect(r.unmatchedBank).toEqual([row("2026-03-10", -10, "b")]);
+    });
+
+    it("reconcile reports unmatched and difference (Unmatched rows on both sides and net difference are reported)", () => {
+        const r = reconcile(
+            book([
+                ...ver("V", 1, "20260310", "Both", [[1930, "-10.00"]]),
+                ...ver("V", 2, "20260311", "Books only", [[1930, "-0.30"]]),
+            ]),
+            [row("2026-03-10", -10), row("2026-03-12", 5.1)],
+            3,
+        );
+        expect(r.unmatchedBank).toEqual([row("2026-03-12", 5.1)]);
+        expect(r.unmatchedLedger.map((l) => l.number)).toEqual(["2"]);
+        expect([r.ledgerTotal, r.bankTotal, r.difference]).toEqual([-10.3, -4.9, -5.4]);
+    });
+
+    it("reconcile flags suspected duplicates (Suspected duplicate ledger lines are flagged)", () => {
+        const r = reconcile(
+            book([
+                ...ver("V", 1, "20260310", "Fee", [[1930, "-25.00"]]),
+                ...ver("V", 2, "20260311", "Fee again", [[1930, "-25.00"]]),
+            ]),
+            [row("2026-03-10", -25), row("2026-03-11", 7)],
+            3,
+        );
+        expect(r.suspectedDuplicates.map((l) => l.number)).toEqual(["2"]);
+    });
+
+    it("recurring amount reconciles fully (Recurring same amount reconciles fully)", () => {
+        const r = reconcile(
+            book([
+                ...ver("V", 1, "20260303", "Fee", [[1930, "-9.00"]]),
+                ...ver("V", 2, "20260306", "Fee", [[1930, "-9.00"]]),
+            ]),
+            [row("2026-03-05", -9), row("2026-03-07", -9)],
+            3,
+        );
+        expect(r.matched).toHaveLength(2);
+        expect([r.unmatchedBank, r.unmatchedLedger, r.difference]).toEqual([[], [], 0]);
+    });
+
+    it("double booking in the margin is still flagged", () => {
+        const r = reconcile(
+            book([
+                ...ver("V", 1, "20260309", "Fee", [[1930, "-25.00"]]),
+                ...ver("V", 2, "20260309", "Fee again", [[1930, "-25.00"]]),
+            ]),
+            [row("2026-03-10", -25)],
+            3,
+        );
+        expect(r.matched).toHaveLength(1);
+        expect(r.suspectedDuplicates).toHaveLength(1);
+        expect(r.unmatchedLedger).toEqual([]);
+    });
+
+    it("margin lines are not reported (Lines outside the statement span are not reported)", () => {
+        const r = reconcile(
+            book([
+                ...ver("V", 1, "20260308", "Before statement", [[1930, "-3.00"]]),
+                ...ver("V", 2, "20260310", "In statement", [[1930, "-10.00"]]),
+            ]),
+            [row("2026-03-10", -10)],
+            3,
+        );
+        expect([r.unmatchedLedger, r.ledgerTotal, r.difference]).toEqual([[], -10, 0]);
+    });
+
+    it("annulled pairs skip matching (Annulled pairs are excluded from duplicate and reconciliation matching)", () => {
+        const body = [
+            ...ver("V", 1, "20260310", "Fee", [[1930, "-25.00"]]),
+            ...ver("V", 2, "20260310", "Fee", [[1930, "-25.00"]]),
+            ...ver("V", 3, "20260310", "Annullering av V2: Fee", [[1930, "25.00"]]),
+        ];
+        expect(duplicates([parseSie(sie(body))], "2026-01-01", "2026-12-31", 7)).toEqual([]);
+        const r = reconcile(book(body), [row("2026-03-10", -25)], 3);
+        expect(r.matched.map((m) => m.ledger.number)).toEqual(["1"]);
+        expect(r.unmatchedLedger).toEqual([]);
     });
 });

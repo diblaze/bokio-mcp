@@ -18,7 +18,7 @@ import {
     tokenWarning,
     writesAllowed,
 } from "./bokio.js";
-import { balancesAt, ledger, parseSie, type Sie } from "./sie.js";
+import { allLines, balancesAt, duplicates, ledger, parseSie, reconcile, type Sie } from "./sie.js";
 
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
@@ -422,6 +422,102 @@ tool(
                 cancelled: z.boolean(),
             }),
         ),
+    },
+);
+
+const lineRef = z.object({
+    date: z.string(),
+    series: z.string(),
+    number: z.string(),
+    text: z.string(),
+});
+const lineOut = lineRef.extend({ amount: z.number() });
+const shift = (d: string, days: number) =>
+    new Date(Date.parse(d) + days * 86_400_000).toISOString().slice(0, 10);
+
+tool(
+    "bokio_find_duplicates",
+    `Possible double bookings: lines with the same account and amount from different verifications within windowDays of each other. Annulled verifications are skipped. ${SIGN}`,
+    {
+        companyId,
+        from: isoDay,
+        to: isoDay,
+        account: z.number().int().optional(),
+        windowDays: z.number().int().min(0).max(90).default(7),
+    },
+    async (a) => {
+        if (a.from > a.to) throw new Error("from is after to");
+        const sies = await loadYears(a.companyId, { from: a.from, to: a.to });
+        return okStructured({ groups: duplicates(sies, a.from, a.to, a.windowDays, a.account) });
+    },
+    {
+        groups: z.array(
+            z.object({ account: z.number(), amount: z.number(), lines: z.array(lineRef) }),
+        ),
+    },
+);
+
+tool(
+    "bokio_reconcile_bank",
+    `Match bank statement rows (date, amount, text) against one ledger account (default 1930) by exact amount within toleranceDays; rows in date order each take the earliest reachable unmatched line, each ledger line once. Returns matched pairs, unmatched rows on each side, suspected duplicate ledger lines and the totals for the statement's date span; difference = ledger minus bank. Amounts at most two decimals. ${SIGN} Bank amounts: outflow negative.`,
+    {
+        companyId,
+        account: z.number().int().default(1930),
+        toleranceDays: z.number().int().min(0).max(30).default(3),
+        rows: z
+            .array(
+                z.object({
+                    date: isoDay,
+                    // whole öre only: more than two decimals would round silently
+                    amount: z
+                        .number()
+                        .refine(
+                            (n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6,
+                            "at most two decimals",
+                        ),
+                    text: z.string().optional(),
+                }),
+            )
+            .min(1),
+    },
+    async (a) => {
+        const dates = a.rows.map((r: { date: string }) => r.date).sort();
+        const from = shift(dates[0], -a.toleranceDays);
+        const to = shift(dates[dates.length - 1], a.toleranceDays);
+        const sies = await loadYears(a.companyId, { from, to });
+        const lines = allLines(sies).filter(
+            (l) => l.account === a.account && !l.cancelled && l.date >= from && l.date <= to,
+        );
+        return okStructured({
+            account: a.account,
+            from,
+            to,
+            ...reconcile(lines, a.rows, a.toleranceDays),
+        });
+    },
+    {
+        account: z.number(),
+        from: z.string(),
+        to: z.string(),
+        matched: z.array(
+            z.object({
+                bank: z.object({
+                    date: z.string(),
+                    amount: z.number(),
+                    text: z.string().optional(),
+                }),
+                ledger: lineOut,
+                dayDiff: z.number(),
+            }),
+        ),
+        unmatchedBank: z.array(
+            z.object({ date: z.string(), amount: z.number(), text: z.string().optional() }),
+        ),
+        unmatchedLedger: z.array(lineOut),
+        suspectedDuplicates: z.array(lineOut),
+        bankTotal: z.number(),
+        ledgerTotal: z.number(),
+        difference: z.number(),
     },
 );
 

@@ -245,3 +245,129 @@ export function ledger(sies: Sie[], account: number, fromDate: string, to: strin
         lines: out,
     };
 }
+
+// ---- duplicates and bank reconciliation ------------------------------------
+
+const DAY = 86_400_000;
+const dayDiff = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / DAY);
+const verId = (l: DatedLine) => `${l.series}${l.number}`;
+const ref = (l: DatedLine) => ({ date: l.date, series: l.series, number: l.number, text: l.text });
+
+/** Same account + amount from different verifications within windowDays of each other. */
+export function duplicates(
+    sies: Sie[],
+    from: string,
+    to: string,
+    windowDays: number,
+    account?: number,
+) {
+    const groups = new Map<string, DatedLine[]>();
+    for (const l of allLines(sies)) {
+        if (l.cancelled || l.amount === 0 || l.date < from || l.date > to) continue;
+        if (account !== undefined && l.account !== account) continue;
+        const k = `${l.account}:${l.amount}`;
+        groups.set(k, [...(groups.get(k) ?? []), l]);
+    }
+    const out: { account: number; amount: number; lines: ReturnType<typeof ref>[] }[] = [];
+    for (const ls of groups.values()) {
+        let cluster: DatedLine[] = [];
+        const flush = () => {
+            if (new Set(cluster.map(verId)).size > 1)
+                out.push({
+                    account: cluster[0].account,
+                    amount: fromOre(cluster[0].amount),
+                    lines: cluster.map(ref),
+                });
+        };
+        for (const l of ls) {
+            if (cluster.length && dayDiff(cluster[cluster.length - 1].date, l.date) > windowDays) {
+                flush();
+                cluster = [];
+            }
+            cluster.push(l);
+        }
+        flush();
+    }
+    return out.sort(
+        (a, b) =>
+            a.account - b.account ||
+            a.amount - b.amount ||
+            a.lines[0].date.localeCompare(b.lines[0].date),
+    );
+}
+
+export interface BankRow {
+    date: string;
+    amount: number; // kronor
+    text?: string;
+}
+
+/**
+ * Match bank rows to ledger lines (one account, not cancelled) by exact öre amount
+ * within toleranceDays. Rows go in date order and each takes the earliest unmatched
+ * reachable line (then lowest verification number): a line an earlier row could use
+ * is never left for a later row that cannot reach it, so a statement that reconciles
+ * shows no false breaks. Each ledger line is used at most once. Unmatched lines are
+ * reported only inside the statement's own date span; margin lines count only when
+ * a row matched them.
+ */
+export function reconcile(lines: DatedLine[], rows: BankRow[], toleranceDays: number) {
+    const sorted = [...rows].sort(
+        (a, b) =>
+            a.date.localeCompare(b.date) ||
+            a.amount - b.amount ||
+            (a.text ?? "").localeCompare(b.text ?? ""),
+    );
+    const free = new Set(lines);
+    const matched: {
+        bank: BankRow;
+        ledger: ReturnType<typeof ref> & { amount: number };
+        dayDiff: number;
+    }[] = [];
+    const unmatchedBank: BankRow[] = [];
+    const used: DatedLine[] = [];
+    for (const r of sorted) {
+        const ore = Math.round(r.amount * 100);
+        const best = [...free]
+            .filter((l) => l.amount === ore && Math.abs(dayDiff(r.date, l.date)) <= toleranceDays)
+            .sort((a, b) => a.date.localeCompare(b.date) || Number(a.number) - Number(b.number))[0];
+        if (!best) {
+            unmatchedBank.push(r);
+            continue;
+        }
+        free.delete(best);
+        used.push(best);
+        matched.push({
+            bank: r,
+            ledger: { ...ref(best), amount: fromOre(best.amount) },
+            dayDiff: Math.abs(dayDiff(r.date, best.date)),
+        });
+    }
+    const first = sorted[0]?.date ?? "";
+    const last = sorted[sorted.length - 1]?.date ?? "";
+    const inSpan = (l: DatedLine) => l.date >= first && l.date <= last;
+    // Totals: lines inside the statement span plus margin lines a row matched.
+    const inside = lines.filter((l) => inSpan(l) || !free.has(l));
+    const left = lines.filter((l) => inSpan(l) && free.has(l));
+    const out = (l: DatedLine) => ({ ...ref(l), amount: fromOre(l.amount) });
+    const ledgerOre = inside.reduce((n, l) => n + l.amount, 0);
+    const bankOre = rows.reduce((n, r) => n + Math.round(r.amount * 100), 0);
+    return {
+        matched,
+        unmatchedBank,
+        unmatchedLedger: left.map(out),
+        // Duplicates are looked for in the whole window, margin included.
+        suspectedDuplicates: lines
+            .filter((l) => free.has(l))
+            .filter((l) =>
+                used.some(
+                    (u) =>
+                        u.amount === l.amount && Math.abs(dayDiff(u.date, l.date)) <= toleranceDays,
+                ),
+            )
+            .map(out),
+        bankTotal: fromOre(bankOre),
+        ledgerTotal: fromOre(ledgerOre),
+        difference: fromOre(ledgerOre - bankOre),
+    };
+}

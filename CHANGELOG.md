@@ -5,7 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ## 0.3.0 — unreleased
 
 ### Added
-- Computed read-only tools, calculated in code (whole öre) from the SIE export so the client never adds up rows itself: `bokio_account_balances` (balance per account at a date) and `bokio_account_ledger` (one account's lines with running balance). Annulled verifications are recognised and net to zero.
+- Computed read-only tools, calculated in code (whole öre) from the SIE export so the client never adds up rows itself: `bokio_account_balances` (balance per account at a date), `bokio_account_ledger` (one account's lines with running balance), `bokio_find_duplicates` (likely double bookings) and `bokio_reconcile_bank` (bank statement rows against the ledger by exact amount within a day tolerance). Annulled verifications are recognised and net to zero.
 
 ## 0.2.0 — unreleased
 
