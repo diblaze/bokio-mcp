@@ -4,8 +4,8 @@
 
 Model Context Protocol server for the [Bokio](https://www.bokio.se/) accounting API.
 
-- **Auth:** private self-serve Bearer token (single company). No OAuth.
-- **Scope:** journal entries, invoices, customers, items, uploads, chart of accounts, fiscal years, SIE export.
+- **Auth:** private integration token, one per company, created by each user in Bokio. OAuth (public integrations) is a possible future addition.
+- **Scope:** journal entries, invoices, credit notes, customers, suppliers, supplier invoices, items, uploads, bank payments (read-only), chart of accounts, fiscal years, SIE export.
 - **Safety:** all write operations are blocked unless `BOKIO_ALLOW_WRITES=1`.
 
 For small companies and consultants who keep their own books in Bokio. Read-only by default, so it is safe to point at live accounting data.
@@ -96,16 +96,7 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 ## Notes
 
 - Journal entries are double-entry: debit total must equal credit total.
-- SIE download is great for reconciling the AB ledger against an external budget.
+- SIE download is handy for reconciling the ledger against another system.
 - Not wrapped yet: tag groups, projects, journal-entry comments and tags, invoice attachments. Read them with `bokio_raw_get`.
 - API reference: <https://docs.bokio.se> · specs: <https://github.com/bokio/bokio-api>
-
-## Contributing
-
-`main` is protected — external changes land via pull request.
-
-1. Fork, branch, commit.
-2. Ensure `pnpm exec biome ci`, `pnpm run typecheck`, `pnpm test`, `pnpm run build`, and `pnpm run smoke` all pass (CI runs the same on Node 22).
-3. Open a PR against `main`. CI must be green and a maintainer (@diblaze, per `CODEOWNERS`) must approve before merge.
-
-Toolchain: TypeScript + pnpm, [Biome](https://biomejs.dev) for lint/format, [Vitest](https://vitest.dev) for tests.
+- Building from source and pull requests: [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md). Changes: [CHANGELOG.md](CHANGELOG.md).
