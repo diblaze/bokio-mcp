@@ -371,3 +371,85 @@ export function reconcile(lines: DatedLine[], rows: BankRow[], toleranceDays: nu
         difference: fromOre(ledgerOre - bankOre),
     };
 }
+
+// ---- period sums: VAT and profit and loss ----------------------------------
+
+function periodSums(sies: Sie[], from: string, to: string, pick: (account: number) => boolean) {
+    const sums = new Map<number, number>();
+    for (const l of allLines(sies))
+        if (l.date >= from && l.date <= to && pick(l.account))
+            sums.set(l.account, (sums.get(l.account) ?? 0) + l.amount);
+    return [...sums].sort((a, b) => a[0] - b[0]);
+}
+
+const sumWhere = (rows: [number, number][], lo: number, hi: number) =>
+    rows.filter(([a]) => a >= lo && a <= hi).reduce((n, [, v]) => n + v, 0);
+
+/**
+ * VAT (2610-2659) and sales (3000-3999) accounts for a period. No tax-return boxes.
+ * Settlement verifications (any line on 2650) are left out: they move the quarter's
+ * VAT into 2650 and would net the period to zero.
+ */
+export function vatSummary(sies: Sie[], from: string, to: string) {
+    const activity = sies.map((s) => ({
+        ...s,
+        vers: s.vers.filter((v) => !v.lines.some((l) => l.account === 2650)),
+    }));
+    const rows = periodSums(
+        activity,
+        from,
+        to,
+        (a) => (a >= 2610 && a <= 2659) || (a >= 3000 && a <= 3999),
+    );
+    const output = -sumWhere(rows, 2610, 2639);
+    const input = sumWhere(rows, 2640, 2649);
+    return {
+        from,
+        to,
+        accounts: rows.map(([account, v]) => ({
+            account,
+            name: nameOf(sies, account),
+            amount: fromOre(v),
+        })),
+        outputVat: fromOre(output),
+        inputVat: fromOre(input),
+        netVat: fromOre(output - input),
+    };
+}
+
+const CLASS_NAMES: Record<string, string> = {
+    "3": "Revenue",
+    "4": "Goods and materials",
+    "5": "Other external costs",
+    "6": "Other external costs",
+    "7": "Personnel and depreciation",
+    "8": "Financial items and tax",
+};
+
+/**
+ * Result accounts (3000-8999) per BAS class or account; result = -sum (profit positive).
+ * The year-end closing verification (any line on 2099, booking 8999 against it) is left
+ * out: it offsets the whole result and would net a closed year to zero.
+ */
+export function profitAndLoss(sies: Sie[], from: string, to: string, groupBy: "class" | "account") {
+    const activity = sies.map((s) => ({
+        ...s,
+        vers: s.vers.filter((v) => !v.lines.some((l) => l.account === 2099)),
+    }));
+    const rows = periodSums(activity, from, to, (a) => a >= 3000 && a <= 8999);
+    const grouped = new Map<string, number>();
+    for (const [a, v] of rows) {
+        const key = groupBy === "class" ? String(a).charAt(0) : String(a);
+        grouped.set(key, (grouped.get(key) ?? 0) + v);
+    }
+    return {
+        from,
+        to,
+        rows: [...grouped].map(([key, v]) => ({
+            key,
+            name: groupBy === "class" ? CLASS_NAMES[key] : nameOf(sies, Number(key)),
+            amount: fromOre(v),
+        })),
+        result: fromOre(-rows.reduce((n, [, v]) => n + v, 0)),
+    };
+}

@@ -60,5 +60,8 @@
 - A full-year SIE for a busy company can be several MB; parsing is linear and in memory. Acceptable for the target users (small companies, E19 quota already bounds scale).
 - `today` as the default date depends on the server clock; `date` can always be passed explicitly.
 
+## Live findings (2026-10-21, local read-only run)
+- Bokio closes each VAT quarter with a `Momsredovisning: …` verification dated on the quarter's last day that moves 2610–2649 into 2650; summing the quarter then nets to zero. `vatSummary` therefore skips verifications with a line on 2650 (the settlement and the later VAT payment).
+
 ## Open Questions
 1. Keep version 0.3.0 with a separate changelog section, or fold into the unmerged 0.2.0 (E11)? Default: 0.3.0.

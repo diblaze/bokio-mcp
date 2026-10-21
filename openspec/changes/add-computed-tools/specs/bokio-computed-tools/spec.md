@@ -163,12 +163,17 @@ The system SHALL group lines with the same account and amount whose dates fall w
 - **THEN** no group is returned
 
 ### Requirement: VAT account summary without return-box mapping
-The system SHALL sum, per account over a period, every account in the VAT range (2610–2659) and the sales range (3000–3999) with ledger sign (debit positive, credit negative), and SHALL return output VAT (negated sum of 2610–2639), input VAT (sum of 2640–2649) and their net; it SHALL NOT map amounts to tax-return boxes.
+The system SHALL sum, per account over a period, every account in the VAT range (2610–2659) and the sales range (3000–3999) with ledger sign (debit positive, credit negative), leaving out VAT settlement verifications (any verification with a line on 2650, which moves the quarter's VAT into the settlement account), and SHALL return output VAT (negated sum of 2610–2639), input VAT (sum of 2640–2649) and their net; it SHALL NOT map amounts to tax-return boxes.
 
 #### Scenario: VAT and sales accounts are summed per account for the period
 - **GIVEN** lines on output VAT, input VAT and sales accounts inside and outside a period
 - **WHEN** the summary is requested
 - **THEN** each account inside the period is listed once with its sum in ledger sign, and lines outside the period are excluded
+
+#### Scenario: VAT settlement verification is left out
+- **GIVEN** a quarter's output and input VAT lines and a settlement verification at quarter end moving both to 2650
+- **WHEN** the summary is requested for the quarter
+- **THEN** output and input VAT are the quarter's amounts, not zero
 
 #### Scenario: Totals derive from account ranges
 - **GIVEN** a credit on an output VAT account and a debit on an input VAT account

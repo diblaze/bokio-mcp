@@ -14,7 +14,7 @@ describe("server tool surface", () => {
         await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 
         const { tools } = await client.listTools();
-        expect(tools.length).toBe(57);
+        expect(tools.length).toBe(59);
 
         // #6: every tool declares an explicit readOnlyHint boolean.
         for (const t of tools) {
@@ -422,6 +422,8 @@ const COMPUTED = [
     "bokio_account_ledger",
     "bokio_find_duplicates",
     "bokio_reconcile_bank",
+    "bokio_vat_summary",
+    "bokio_profit_and_loss",
 ];
 
 describe("computed tools", () => {
