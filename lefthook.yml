@@ -3,6 +3,11 @@ pre-commit:
     - name: biome
       run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
       stage_fixed: true
+    - name: actionlint
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: actionlint {staged_files}
+      skip:
+        - run: "! command -v actionlint >/dev/null"
 
 commit-msg:
   jobs:

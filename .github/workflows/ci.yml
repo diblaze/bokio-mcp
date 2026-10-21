@@ -35,6 +35,11 @@ jobs:
         if: github.event_name == 'pull_request'
         run: pnpm exec commitlint --default-config --from "$(git merge-base ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})" --to ${{ github.event.pull_request.head.sha }}
 
+      - name: Workflows (actionlint + shellcheck)
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
+
       - name: Lint & format (biome)
         run: pnpm exec biome ci
 
