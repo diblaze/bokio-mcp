@@ -10,7 +10,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 
 | File | Description |
 |------|-------------|
-| `src/index.ts` | Server entry: builds the `McpServer`, registers all 60 tools via the `tool()` helper, gates `main()` on being the entry point. Exports `server` for tests. |
+| `src/index.ts` | Server entry: builds the `McpServer` with the `INSTRUCTIONS` sent at initialize (keep them short and true to the tools), registers all 60 tools via the `tool()` helper, gates `main()` on being the entry point. Exports `server` for tests. |
 | `src/sie.ts` | SIE 4 export parser (PC8/CP437, `#RAR 0`, annulment pairs) and the pure öre computations behind the computed tools. |
 | `src/bokio.ts` | HTTP client + config: `bokioRequest` (JSON, enforces the write gate), `bokioDownload` (binary GET), `fileForm`, `filterQuery`, `resolveCompanyId`, `writesAllowed`, `downloadTarget`. |
 | `test/bokio.test.ts` | Unit tests (mocked `fetch`) for the client, write gate, filterQuery, downloadTarget. |

@@ -357,6 +357,36 @@ describe("distribution", () => {
     });
 });
 
+describe("server instructions", () => {
+    it("initialize carries short instructions (Instructions are present in the initialize result)", async () => {
+        const client = await connect();
+        const i = client.getInstructions();
+        expect(typeof i).toBe("string");
+        expect(i?.length).toBeGreaterThan(0);
+        expect(i?.length).toBeLessThanOrEqual(2000);
+        await client.close();
+    });
+
+    it("instructions name the write gate (Instructions cover the write gate)", async () => {
+        const client = await connect();
+        const i = client.getInstructions() ?? "";
+        for (const phrase of ["BOKIO_ALLOW_WRITES", "destructive"]) expect(i).toContain(phrase);
+        await client.close();
+    });
+
+    it("instructions name the accuracy rules (Instructions cover computed tools, ledger sign and export cost)", async () => {
+        const client = await connect();
+        const i = client.getInstructions() ?? "";
+        for (const phrase of ["debit positive, credit negative", "fiscal year", "bokio_raw_get"])
+            expect(i).toContain(phrase);
+        const listed = new Set((await client.listTools()).tools.map((t) => t.name));
+        const named = i.match(/bokio_\w+/g) ?? [];
+        expect(named.length).toBeGreaterThan(0);
+        for (const name of named) expect(listed, name).toContain(name);
+        await client.close();
+    });
+});
+
 describe("path ids", () => {
     it("ids that would change the URL path are rejected before any request (Path ids cannot change the request path)", async () => {
         const client = await connect();
