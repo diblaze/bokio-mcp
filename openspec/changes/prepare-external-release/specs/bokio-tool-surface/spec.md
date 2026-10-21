@@ -32,6 +32,14 @@ The system SHALL provide read tools to list and get suppliers and supplier invoi
 - **WHEN** a body omits the supplier name, or gives payment details of a type without that type's identifier, or omits the supplier reference, invoice date, due date or total amount on a supplier invoice
 - **THEN** validation fails, and a body with all required fields passes
 
+### Requirement: Supplier invoice update is marked destructive
+The system SHALL annotate the supplier-invoice update tool as destructive, because Bokio removes line items left out of the body, and SHALL NOT accept `uploadRef` on update, which Bokio's update schema lacks.
+
+#### Scenario: Supplier invoice update replaces line items
+- **GIVEN** writes are enabled
+- **WHEN** the client lists tools
+- **THEN** the supplier-invoice update tool has `destructiveHint` true and its body schema has no `uploadRef`
+
 ### Requirement: Invoice payments and settlements are exposed as tools
 The system SHALL provide read tools to list payments and settlements of an invoice, and a gated write tool to create a settlement whose type is one of the creatable types and whose details match that type.
 
