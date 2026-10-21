@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 - Usage instructions in the MCP initialize response: read-only default and the write gate, confirm destructive tools, prefer the computed tools over summing journal entries, ledger sign, one SIE export per fiscal year per call, `companyId` default.
+- `LLM.md`: a setup guide an AI agent can follow to install and configure the server; linked from the README.
 
 ## 0.3.0 — 2026-10-21
 

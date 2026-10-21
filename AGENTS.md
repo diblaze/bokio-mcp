@@ -20,6 +20,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `scripts/pack-check.mjs` | `npm pack --dry-run`: tarball holds only `dist/`, README, LICENSE, `package.json`. Run via `pnpm run pack:check` (CI). |
 | `biome.json` | Biome config: 4-space, 100 cols, double quotes, semicolons, organize-imports. |
 | `pnpm-workspace.yaml` | Carries `allowBuilds`: `esbuild: true` (pnpm 11 needs it for vitest), `lefthook: false` (hooks come from `prepare`). |
+| `LLM.md` | Setup guide addressed to an AI agent; linked from the README, not shipped in the tarball. |
 | `lefthook.yml` | Git hooks, installed by `pnpm install` (`prepare: lefthook install --reset-hooks-path`, which also clears an old `core.hooksPath`): pre-commit Biome on staged files + actionlint on staged workflows (skipped when not on PATH), commit-msg commitlint (Conventional Commits, built-in config). |
 | `.github/workflows/ci.yml` | CI: Node matrix [22, 24], pnpm, commitlint over the PR's commits → actionlint (+ shellcheck) → `biome ci` → typecheck → test → build → smoke → pack:check. |
 | `.github/CODEOWNERS` | `* @diblaze` — required reviewer on PRs. |
