@@ -21,7 +21,7 @@ To try a local build in an MCP client, point it at `node /path/to/bokio-mcp/dist
 
 ## Pull requests
 
-1. Fork, branch, commit.
+1. Fork, branch, commit. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) (`feat: …`, `fix(api): …`). `pnpm install` sets up git hooks that format staged files and check each message; CI checks every commit in the PR as well, because PRs are rebase-merged.
 2. Make sure `pnpm exec biome ci`, `pnpm run typecheck`, `pnpm test`, `pnpm run build` and `pnpm run smoke` pass (CI runs the same on Node 22 and 24).
 3. Open a PR against `main`. CI must be green and a maintainer (per `CODEOWNERS`) must approve.
 
