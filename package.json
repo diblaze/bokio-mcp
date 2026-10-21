@@ -23,7 +23,6 @@
     "prepublishOnly": "npm run build",
     "lint": "biome check",
     "format": "biome check --write",
-    "prepare": "git config core.hooksPath .githooks",
     "pack:check": "node scripts/pack-check.mjs"
   },
   "dependencies": {

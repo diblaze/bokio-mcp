@@ -51,7 +51,6 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 - **Lint/format is Biome, 4-space.** Run `pnpm run format` (writes) / `pnpm run lint` (checks). CI runs `pnpm exec biome ci` and it must be clean.
 - **`main` is branch-protected**: external changes need a PR with green CI (`build (22)`, `build (24)`) + 1 approval (CODEOWNERS @diblaze). The owner has admin bypass.
 - Publishing to npm is an owner step after the release commit lands on `main`; agents never run `npm publish`. Bump `version` in `package.json` only (the server reads it at startup) and add a `CHANGELOG.md` entry.
-- **AGENTS.md ↔ CLAUDE.md:** every `AGENTS.md` has a sibling `CLAUDE.md` containing `@AGENTS.md` (Claude Code auto-loads CLAUDE.md, not AGENTS.md). A pre-commit hook (`.githooks/pre-commit` → `scripts/ensure-claude-imports.mjs`, activated by `pnpm install` via `prepare`) auto-creates+stages the bridge when you add/change an AGENTS.md. Don't hand-delete the CLAUDE.md bridges.
 
 ### Adding or changing a tool
 
