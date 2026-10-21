@@ -1,0 +1,247 @@
+// SIE 4 export parser and the pure computations behind the computed tools.
+// Money is integer öre inside; public functions return kronor (ore / 100) once.
+// Sign is the ledger's: debit positive, credit negative.
+
+export interface SieLine {
+    account: number;
+    amount: number; // öre
+}
+
+export interface SieVer {
+    series: string;
+    number: string;
+    date: string; // YYYY-MM-DD
+    text: string;
+    cancelled: boolean;
+    lines: SieLine[];
+}
+
+export interface Sie {
+    from: string;
+    to: string;
+    accounts: Map<number, string>;
+    ib: Map<number, number>;
+    ub: Map<number, number>;
+    vers: SieVer[];
+}
+
+// ---- money -----------------------------------------------------------------
+
+/** "-1234.5" -> -123450 öre, by string split (no float). */
+export function toOre(text: string): number {
+    const m = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(text.trim());
+    if (!m) throw new Error(`not an amount with at most two decimals: ${text}`);
+    const ore = Number(m[2]) * 100 + Number((m[3] ?? "").padEnd(2, "0"));
+    return m[1] ? -ore : ore;
+}
+
+export const fromOre = (ore: number): number => ore / 100;
+
+// ---- decoding and parsing --------------------------------------------------
+
+// CP437 bytes 0x80-0xFF. Node's TextDecoder has no ibm437.
+const CP437_HIGH =
+    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
+
+export function decodeSie(buf: Buffer): string {
+    if (buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf)
+        return buf.subarray(3).toString("utf8");
+    const latin = buf.toString("latin1");
+    if (!/^#FORMAT\s+PC8\b/m.test(latin)) return latin;
+    let out = "";
+    for (const b of buf) out += b < 0x80 ? String.fromCharCode(b) : CP437_HIGH[b - 0x80];
+    return out;
+}
+
+const STR = String.raw`"(?:[^"\\]|\\.)*"|\S+`;
+const BAL = /^#(?:IB|UB)\s+0\s+(\d+)\s+(-?[\d.]+)/;
+// Only year index 0 (the exported year) is kept; other #RAR/#IB/#UB indices are skipped.
+const PATTERNS: Record<string, RegExp> = {
+    "#RAR": /^#RAR\s+0\s+(\d{8})\s+(\d{8})/,
+    "#KONTO": new RegExp(String.raw`^#KONTO\s+(\d+)\s+(${STR})`),
+    "#IB": BAL,
+    "#UB": BAL,
+    "#VER": new RegExp(String.raw`^#VER\s+(${STR})\s+(${STR})\s+(\d{8})(?:\s+(${STR}))?`),
+    "#TRANS": /^#TRANS\s+(\d+)\s+\{[^}]*\}\s+(-?[\d.]+)/,
+};
+const unquote = (s = "") => (s.startsWith('"') ? s.slice(1, -1).replace(/\\"/g, '"') : s);
+const isoDate = (d: string) => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+
+export function parseSie(buf: Buffer): Sie {
+    const s: Sie = {
+        from: "",
+        to: "",
+        accounts: new Map(),
+        ib: new Map(),
+        ub: new Map(),
+        vers: [],
+    };
+    let cur: SieVer | undefined;
+    for (const raw of decodeSie(buf).split(/\r?\n/)) {
+        const line = raw.trim();
+        const tag = line.split(/\s/, 1)[0];
+        const m = PATTERNS[tag]?.exec(line);
+        if (!m) continue;
+        if (tag === "#RAR") {
+            s.from = isoDate(m[1]);
+            s.to = isoDate(m[2]);
+        } else if (tag === "#KONTO") {
+            s.accounts.set(Number(m[1]), unquote(m[2]));
+        } else if (tag === "#IB" || tag === "#UB") {
+            (tag === "#IB" ? s.ib : s.ub).set(Number(m[1]), toOre(m[2]));
+        } else if (tag === "#VER") {
+            cur = {
+                series: unquote(m[1]),
+                number: unquote(m[2]),
+                date: isoDate(m[3]),
+                text: unquote(m[4]),
+                cancelled: false,
+                lines: [],
+            };
+            s.vers.push(cur);
+        } else if (cur) {
+            cur.lines.push({ account: Number(m[1]), amount: toOre(m[2]) });
+        }
+    }
+    if (!s.from) throw new Error("SIE export has no #RAR line (fiscal-year range)");
+    markAnnulments(s.vers);
+    return s;
+}
+
+const lineKey = (l: SieLine[], sign: number) =>
+    l
+        .map((x) => `${x.account}:${x.amount * sign}`)
+        .sort()
+        .join(",");
+
+/** "Annullering av V7: ..." whose lines negate V7 cancels both. */
+export function markAnnulments(vers: SieVer[]): void {
+    const byId = new Map(vers.map((v) => [`${v.series}${v.number}`, v]));
+    for (const v of vers) {
+        const target = byId.get(/^Annullering av (\S+):/.exec(v.text)?.[1] ?? "");
+        if (target && lineKey(target.lines, -1) === lineKey(v.lines, 1)) {
+            target.cancelled = true;
+            v.cancelled = true;
+        }
+    }
+}
+
+// ---- shared ----------------------------------------------------------------
+
+export interface DatedLine extends SieLine {
+    date: string;
+    series: string;
+    number: string;
+    text: string;
+    cancelled: boolean;
+    index: number;
+}
+
+/** Every line of the loaded years, sorted by date, series, number, line order. */
+export function allLines(sies: Sie[]): DatedLine[] {
+    const out: DatedLine[] = [];
+    for (const s of sies)
+        for (const v of s.vers)
+            v.lines.forEach((l, index) => {
+                out.push({
+                    ...l,
+                    date: v.date,
+                    series: v.series,
+                    number: v.number,
+                    text: v.text,
+                    cancelled: v.cancelled,
+                    index,
+                });
+            });
+    return out.sort(
+        (a, b) =>
+            a.date.localeCompare(b.date) ||
+            a.series.localeCompare(b.series) ||
+            Number(a.number) - Number(b.number) ||
+            a.number.localeCompare(b.number) ||
+            a.index - b.index,
+    );
+}
+
+/** Result accounts (classes 3-8) carry no opening balance. */
+const opening = (s: Sie, account: number) => (account >= 3000 ? 0 : (s.ib.get(account) ?? 0));
+
+const nameOf = (sies: Sie[], account: number) =>
+    sies.map((s) => s.accounts.get(account)).find((n) => n !== undefined) ?? "";
+
+function yearOf(sies: Sie[], date: string): Sie {
+    const s = sies.find((x) => x.from <= date && date <= x.to);
+    if (!s) throw new Error(`${date} is outside the loaded fiscal years`);
+    return s;
+}
+
+// ---- balances and ledger ---------------------------------------------------
+
+export function balancesAt(sies: Sie[], date: string, accounts?: number[]) {
+    const s = yearOf(sies, date);
+    const moves = new Map<number, number>();
+    for (const v of s.vers)
+        if (v.date <= date)
+            for (const l of v.lines) moves.set(l.account, (moves.get(l.account) ?? 0) + l.amount);
+    const want = accounts ? new Set(accounts) : new Set([...s.ib.keys(), ...moves.keys()]);
+    return [...want]
+        .sort((a, b) => a - b)
+        .map((account) => {
+            const o = opening(s, account);
+            const m = moves.get(account) ?? 0;
+            return {
+                account,
+                name: nameOf(sies, account),
+                opening: fromOre(o),
+                movement: fromOre(m),
+                balance: fromOre(o + m),
+            };
+        });
+}
+
+/**
+ * Lines on one account in [from, to] with running balance. At each fiscal-year start
+ * the balance restarts from that year's opening (#IB 0; 0 for result accounts), so
+ * result accounts reset and balance accounts follow the export, not a carried sum.
+ */
+export function ledger(sies: Sie[], account: number, fromDate: string, to: string) {
+    const ordered = [...sies].sort((a, b) => a.from.localeCompare(b.from));
+    // Nothing is known before the first loaded year: start the range there.
+    const from = fromDate < ordered[0].from ? ordered[0].from : fromDate;
+    const lines = allLines(ordered).filter((l) => l.account === account);
+    let year = ordered.find((s) => s.to >= from) as Sie;
+    let bal =
+        opening(year, account) +
+        lines.filter((l) => l.date >= year.from && l.date < from).reduce((n, l) => n + l.amount, 0);
+    const open = bal;
+    const out = lines
+        .filter((l) => l.date >= from && l.date <= to)
+        .map((l) => {
+            if (l.date > year.to) {
+                year = yearOf(ordered, l.date);
+                bal = opening(year, account);
+            }
+            bal += l.amount;
+            return {
+                date: l.date,
+                series: l.series,
+                number: l.number,
+                text: l.text,
+                amount: fromOre(l.amount),
+                balance: fromOre(bal),
+                cancelled: l.cancelled,
+            };
+        });
+    // The range may end in a later year with no lines yet: close from that year's opening.
+    const end = ordered.find((s) => s.from <= to && to <= s.to) ?? ordered[ordered.length - 1];
+    if (end.from > year.to) bal = opening(end, account);
+    return {
+        account,
+        name: nameOf(sies, account),
+        from,
+        to,
+        opening: fromOre(open),
+        closing: fromOre(bal),
+        lines: out,
+    };
+}

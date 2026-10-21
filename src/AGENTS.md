@@ -5,14 +5,15 @@
 
 ## Purpose
 
-The server implementation: a thin, convention-driven MCP wrapper over the Bokio REST API. Two files — the tool registry/entry (`index.ts`) and the HTTP client + config helpers (`bokio.ts`).
+The server implementation: a thin, convention-driven MCP wrapper over the Bokio REST API. Three files — the tool registry/entry (`index.ts`), the HTTP client + config helpers (`bokio.ts`) and the SIE parser + computations (`sie.ts`).
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
-| `index.ts` | Creates and **exports** `server` (`McpServer`). Defines the `tool()` helper that registers each tool with derived annotations + read-only gating. Registers all 53 tools. `main()` opens stdio only when run as the entry point (`isEntryPoint()`: `realpathSync(process.argv[1])` equals this file, so the npm bin symlink works; a non-file argv[1] counts as imported), so importing for tests does not connect. |
+| `index.ts` | Creates and **exports** `server` (`McpServer`). Defines the `tool()` helper that registers each tool with derived annotations + read-only gating. Registers all 55 tools. `main()` opens stdio only when run as the entry point (`isEntryPoint()`: `realpathSync(process.argv[1])` equals this file, so the npm bin symlink works; a non-file argv[1] counts as imported), so importing for tests does not connect. |
 | `bokio.ts` | `bokioRequest<T>` (JSON; enforces the write gate at the single choke point), `bokioDownload` (binary GET), `fileForm` (multipart upload), `filterQuery` (journal date-filter join, unit-tested), `downloadTarget` (path confinement), `resolveCompanyId`, `writesAllowed`, `baseUrl`. 30s `AbortSignal.timeout` on every request. |
+| `sie.ts` | `parseSie` (PC8/CP437 table, `#RAR 0`/`#IB 0`/`#UB 0` only, lines dated by their `#VER`, `markAnnulments`) and pure computations returning kronor from öre sums. No I/O; `index.ts` downloads via `loadYears`. |
 
 ## For AI Agents
 
