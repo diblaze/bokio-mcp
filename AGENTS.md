@@ -19,8 +19,9 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `scripts/smoke.mjs` | Spawns built `dist/index.js` directly and through a symlink (as npm installs bins), runs the MCP handshake + `tools/list`, asserts read-only surface (writes hidden, all annotated). Run via `pnpm run smoke`. |
 | `scripts/pack-check.mjs` | `npm pack --dry-run`: tarball holds only `dist/`, README, LICENSE, `package.json`. Run via `pnpm run pack:check` (CI). |
 | `biome.json` | Biome config: 4-space, 100 cols, double quotes, semicolons, organize-imports. |
-| `pnpm-workspace.yaml` | Carries `allowBuilds: esbuild: true` (pnpm 11 needs it for vitest). |
-| `.github/workflows/ci.yml` | CI: Node matrix [22, 24], pnpm, `biome ci` → typecheck → test → build → smoke → pack:check. |
+| `pnpm-workspace.yaml` | Carries `allowBuilds`: `esbuild: true` (pnpm 11 needs it for vitest), `lefthook: false` (hooks come from `prepare`). |
+| `lefthook.yml` | Git hooks, installed by `pnpm install` (`prepare: lefthook install --reset-hooks-path`, which also clears an old `core.hooksPath`): pre-commit Biome on staged files, commit-msg commitlint (Conventional Commits, built-in config). |
+| `.github/workflows/ci.yml` | CI: Node matrix [22, 24], pnpm, commitlint over the PR's commits → `biome ci` → typecheck → test → build → smoke → pack:check. |
 | `.github/CODEOWNERS` | `* @diblaze` — required reviewer on PRs. |
 
 ## Subdirectories
@@ -35,8 +36,9 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 ## Coding standard
 - Stack: TypeScript 5 (ESM; runtime Node ≥ 22, development ≥ 22.13 for pnpm 11) — MCP SDK ^1.29, Context7 `/modelcontextprotocol/typescript-sdk` (version `v1.29.0`); zod ^4, Context7 `/colinhacks/zod`. Bokio API: OpenAPI `bokio/bokio-api` branch `v1`, `api-specification/company-api.yaml`.
 - Package manager: pnpm (lockfile `pnpm-lock.yaml`). Never npm/yarn (npm only for the owner's `npm publish`).
-- Check: `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check` — green before commit. CI: `.github/workflows/ci.yml` (Node 22 + 24).
-- Format/lint: Biome, `biome.json` is law. Run `pnpm run format` before commit.
+- Check: `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check` — green before commit. CI: `.github/workflows/ci.yml` (Node 22 + 24) also runs commitlint over the PR's commits.
+- Format/lint: Biome, `biome.json` is law. Run `pnpm run format` before commit (the pre-commit hook fixes staged files).
+- Commits: Conventional Commits (`@commitlint/config-conventional` as-is), enforced by the commit-msg hook and in CI for every commit in a PR.
 - Tests: vitest, `test/*.test.ts`. Public surface only: tools through the in-memory client, pure functions from `src/sie.ts`/`src/bokio.ts`; `fetch` stubbed (`vi.stubGlobal`) as the only trust-boundary stub; no live Bokio calls. Test names end with the spec scenario name in parentheses. Bare `.skip`/`.only` is a blocker.
 - Style: money is integer öre inside, kronor (`ore / 100`) only at the output edge, never float sums. Every tool goes through `tool()`; a tool with an output shape returns `okStructured(...)`. Ids in URL paths use `idParam`. New behaviour lands with an OpenSpec change (`openspec/changes/`) and is folded into `openspec/specs/` in the PR.
 - Language: code, docs, commits English.

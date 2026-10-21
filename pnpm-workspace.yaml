@@ -1,3 +1,4 @@
 # Single-package repo; this file also carries pnpm settings (pnpm 11+).
 allowBuilds:
   esbuild: true
+  lefthook: false
