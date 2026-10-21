@@ -453,3 +453,41 @@ export function profitAndLoss(sies: Sie[], from: string, to: string, groupBy: "c
         result: fromOre(-rows.reduce((n, [, v]) => n + v, 0)),
     };
 }
+
+// ---- open items -------------------------------------------------------------
+
+/**
+ * Open items on one account up to asOf: postings carry the account's normal sign
+ * (debit for 1xxx, credit for 2xxx); each payment (opposite sign) settles the
+ * earliest unpaid posting of the same amount dated on or before it (FIFO, exact
+ * öre). Annulled verifications are skipped; the oldest loaded #IB is reported as
+ * an unitemised opening amount.
+ */
+export function openItems(sies: Sie[], account: number, asOf: string) {
+    const ordered = [...sies].sort((a, b) => a.from.localeCompare(b.from));
+    const ib = opening(ordered[0], account);
+    const lines = allLines(ordered).filter((l) => l.account === account && l.date <= asOf);
+    const live = lines.filter((l) => !l.cancelled);
+    // Assets (1xxx) are posted as debits, liabilities (2xxx) as credits; the IB may have either sign.
+    const sign = account < 2000 ? 1 : -1;
+    const open: DatedLine[] = [];
+    const unmatched: DatedLine[] = [];
+    for (const l of live) {
+        if (Math.sign(l.amount) === sign) {
+            open.push(l);
+            continue;
+        }
+        const i = open.findIndex((o) => o.amount === -l.amount && o.date <= l.date);
+        if (i >= 0) open.splice(i, 1);
+        else unmatched.push(l);
+    }
+    const out = (l: DatedLine) => ({ ...ref(l), amount: fromOre(l.amount) });
+    return {
+        account,
+        asOf,
+        openingUnitemised: fromOre(ib),
+        open: open.map((l) => ({ ...out(l), ageDays: dayDiff(l.date, asOf) })),
+        unmatchedPayments: unmatched.map(out),
+        balance: fromOre(ib + lines.reduce((n, l) => n + l.amount, 0)),
+    };
+}

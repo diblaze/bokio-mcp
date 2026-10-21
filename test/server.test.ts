@@ -14,7 +14,7 @@ describe("server tool surface", () => {
         await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 
         const { tools } = await client.listTools();
-        expect(tools.length).toBe(59);
+        expect(tools.length).toBe(60);
 
         // #6: every tool declares an explicit readOnlyHint boolean.
         for (const t of tools) {
@@ -424,6 +424,7 @@ const COMPUTED = [
     "bokio_reconcile_bank",
     "bokio_vat_summary",
     "bokio_profit_and_loss",
+    "bokio_open_items",
 ];
 
 describe("computed tools", () => {
@@ -532,8 +533,50 @@ describe("computed tools", () => {
         expect(res.structuredContent).toMatchObject({
             account: 1930,
             matched: [{ dayDiff: 1, ledger: { number: "1", amount: -30 } }],
+            unmatchedLedger: [],
             difference: 0,
         });
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+
+    it("invalid dates and amounts rejected (Invalid dates and sub-öre amounts are rejected)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        for (const rows of [
+            [{ date: "2026-02-31", amount: -1 }],
+            [{ date: "2026-02-03", amount: 1.005 }],
+        ]) {
+            const res = await client.callTool({
+                name: "bokio_reconcile_bank",
+                arguments: { rows },
+            });
+            expect(res.isError, JSON.stringify(rows)).toBe(true);
+        }
+        expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+
+    it("the other computed tools return structured content (the SDK client checks it against the output schema)", async () => {
+        const client = await connect();
+        mockBokio();
+        const calls: [string, Record<string, unknown>][] = [
+            ["bokio_find_duplicates", { from: "2026-01-01", to: "2026-12-31" }],
+            ["bokio_vat_summary", { from: "2026-01-01", to: "2026-03-31" }],
+            ["bokio_profit_and_loss", { from: "2026-01-01", to: "2026-12-31", groupBy: "account" }],
+            ["bokio_open_items", { account: 1930, asOf: "2026-06-30" }],
+        ];
+        for (const [name, args] of calls) {
+            const res = await client.callTool({ name, arguments: args });
+            expect(res.isError, name).toBeFalsy();
+            expect(typeof res.structuredContent, name).toBe("object");
+        }
+        const oi = await client.callTool({
+            name: "bokio_open_items",
+            arguments: { account: 1930, asOf: "2026-06-30" },
+        });
+        expect(oi.structuredContent).toMatchObject({ openingUnitemised: 0, balance: 70 });
         vi.unstubAllGlobals();
         await client.close();
     });

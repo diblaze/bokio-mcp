@@ -48,7 +48,7 @@
 - Annulments (E23): a verification whose text matches `^Annullering av (\S+):` and whose lines are the exact negation of the named verification marks both `cancelled`. Duplicates, reconcile and open items skip cancelled lines; the ledger keeps them with `cancelled: true`; balances need no special case (they net). Negation check guards against a text-only false positive.
 - Sign convention: every amount is in ledger sign (debit positive, credit negative) — the same as Bokio's API and UI; only the derived totals (`outputVat`, `inputVat`, `netVat`, `result`) are negated so that "owed" and "profit" read positive. One rule, stated in each description.
 - Files: `src/sie.ts` holds parser and pure computations (`parseSie`, `balancesAt`, `ledger`, `reconcile`, `duplicates`, `vatSummary`, `openItems`, `profitAndLoss`); registration and the fiscal-year loader stay in `src/index.ts` because `tool()` is not exported (E1). Two source files beat a module per tool.
-- Tie-breaks are fixed: ledger lines sort by date, series, number, line index; reconcile picks smallest |Δdays|, then earliest ledger date, then lowest number; duplicate groups sort by account, amount, first date. Same input → same output.
+- Tie-breaks are fixed: ledger lines sort by date, series, number, line index; reconcile takes rows in date order and gives each the earliest reachable unmatched line, then lowest number (closest-date-first lost in review: two same-amount rows two days apart could break a statement that reconciles); duplicate groups sort by account, amount, first date. Same input → same output.
 - Open items: FIFO on exact amount per account; default `account` 1510, `lookbackYears` 1 so a December posting paid in January pairs; the oldest loaded `#IB` is reported as `openingUnitemised` (E18).
 - Duplicate window default 7 days: catches a same-week double booking, misses a recurring monthly charge.
 - Version 0.3.0 with its own changelog section (E11): new tools are a minor bump; PR #7 stays reviewable as 0.2.0. If 0.2.0 never ships, the owner folds the two sections at release.
@@ -62,6 +62,8 @@
 
 ## Live findings (2026-10-21, local read-only run)
 - Bokio closes each VAT quarter with a `Momsredovisning: …` verification dated on the quarter's last day that moves 2610–2649 into 2650; summing the quarter then nets to zero. `vatSummary` therefore skips verifications with a line on 2650 (the settlement and the later VAT payment).
+
+- Bokio closes a fiscal year with an `Årets resultat` verification (8999 against 2099) on its last day; P&L for a closed year then nets to zero, so `profitAndLoss` skips verifications with a line on 2099 (checked on a real closed-year export: zero before the fix, the booked result after).
 
 ## Open Questions
 1. Keep version 0.3.0 with a separate changelog section, or fold into the unmerged 0.2.0 (E11)? Default: 0.3.0.

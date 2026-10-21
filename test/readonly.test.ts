@@ -13,6 +13,18 @@ describe("read-only mode", () => {
         await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
         const { tools } = await client.listTools();
         expect(tools.length).toBeGreaterThan(0);
+        // Computed tools are read-only, so they stay listed with writes off.
+        const names = new Set(tools.map((t) => t.name));
+        for (const n of [
+            "bokio_account_balances",
+            "bokio_account_ledger",
+            "bokio_find_duplicates",
+            "bokio_reconcile_bank",
+            "bokio_vat_summary",
+            "bokio_profit_and_loss",
+            "bokio_open_items",
+        ])
+            expect(names.has(n), n).toBe(true);
         for (const t of tools) {
             expect(t.description).not.toContain("WRITE.");
             expect(t.annotations?.readOnlyHint).toBe(true);
