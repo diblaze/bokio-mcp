@@ -59,7 +59,7 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 | `BOKIO_TOKEN` | yes (at call time) | Private Bearer token |
 | `BOKIO_COMPANY_ID` | default company | Omit a tool's `companyId` to use this |
 | `BOKIO_ALLOW_WRITES` | no | `1`/`true`/`yes`/`on` enables writes; otherwise blocked |
-| `BOKIO_DOWNLOAD_DIR` | no | Confines SIE/upload downloads to this dir (rejects path traversal) |
+| `BOKIO_DOWNLOAD_DIR` | recommended | Directory for SIE, PDF and upload downloads. Without it, downloads are confined to the server's working directory (for Claude Desktop that is often `/`, so set this). Paths outside are rejected; existing files are never overwritten |
 | `BOKIO_BASE_URL` | no | Defaults to `https://api.bokio.se/v1` |
 
 ## Tools
@@ -68,7 +68,9 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 
 **Journal:** `bokio_list_journal_entries` (`from`/`to`/`query`), `bokio_get_journal_entry`, `bokio_create_journal_entry` *(write)*, `bokio_reverse_journal_entry` *(write)*
 
-**Invoices:** `bokio_list_invoices`, `bokio_get_invoice`, `bokio_create_invoice` *(write)*, `bokio_update_invoice` *(write)*, `bokio_delete_invoice` *(write)*, `bokio_publish_invoice` *(write)*, `bokio_record_invoice` *(write)*, `bokio_create_invoice_payment` *(write)*
+**Invoices:** `bokio_list_invoices`, `bokio_get_invoice`, `bokio_create_invoice` *(write)*, `bokio_update_invoice` *(write)*, `bokio_delete_invoice` *(write)*, `bokio_publish_invoice` *(write)*, `bokio_record_invoice` *(write)*, `bokio_create_invoice_payment` *(write)*, `bokio_download_invoice` (PDF), `bokio_list_invoice_payments`, `bokio_list_invoice_settlements`, `bokio_create_invoice_settlement` *(write)*
+
+**Credit notes:** `bokio_list_credit_notes`, `bokio_get_credit_note`, `bokio_download_credit_note` (PDF), `bokio_create_credit_note` *(write, from an invoice)*, `bokio_update_credit_note` *(write)*, `bokio_publish_credit_note` *(write)*, `bokio_record_credit_note` *(write)*, `bokio_delete_credit_note` *(write, drafts only)*
 
 **Customers:** `bokio_list_customers`, `bokio_get_customer`, `bokio_create_customer` *(write)*, `bokio_update_customer` *(write)*
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -172,11 +173,50 @@ const itemBody = z
     })
     .catchall(z.unknown());
 
+// Draft credit notes only (Bokio rejects updates to published ones). `id` is injected by the tool.
+export const creditNoteBody = z
+    .object({
+        currency: z.string().describe("ISO currency code, e.g. SEK"),
+        creditDate: z.string().describe("YYYY-MM-DD"),
+        dueDate: z.string().describe("YYYY-MM-DD"),
+        lineItems: z
+            .array(z.record(z.string(), z.unknown()))
+            .min(1)
+            .describe("At least one line item"),
+    })
+    .catchall(z.unknown());
+
+// Flat inputs; the tool nests date/sumBaseCurrency/vatScheme into invoiceSettlementDetails.
+export const settlementBody = z
+    .object({
+        type: z.enum(["currency", "bankFee", "paymentServiceFee"]),
+        date: z.string().describe("YYYY-MM-DD"),
+        sumBaseCurrency: z.number(),
+        vatScheme: z
+            .enum(["domestic", "eu", "nonEu", "vatExempt"])
+            .optional()
+            .describe("Required for paymentServiceFee only"),
+    })
+    .refine((s) => (s.type === "paymentServiceFee") === (s.vatScheme !== undefined), {
+        message: "vatScheme is required for paymentServiceFee and not allowed otherwise",
+        path: ["vatScheme"],
+    });
+
 function paging(args: { page?: number; pageSize?: number; query?: string }): Query {
     return { page: args.page, pageSize: args.pageSize ?? 100, query: args.query };
 }
 
 const cbase = (cid?: string) => `/companies/${resolveCompanyId(cid)}`;
+
+// Validate the target before downloading, so a bad path costs no API request.
+// Never overwrite: download tools are read-only, so they must not clobber existing files.
+async function saveDownload(path: string, savePath: string): Promise<Result> {
+    const target = downloadTarget(savePath);
+    if (existsSync(target)) throw new Error(`${target} already exists; choose a new savePath`);
+    const buf = await bokioDownload(path);
+    await writeFile(target, buf, { flag: "wx" });
+    return ok(`Wrote ${buf.length} bytes to ${target}`);
+}
 
 // ---- meta ------------------------------------------------------------------
 
@@ -226,12 +266,9 @@ tool(
     "Download the SIE file for a fiscal year. Saves to savePath if given, else returns a text preview.",
     { fiscalYearId: z.string(), companyId, savePath: z.string().optional() },
     async (a) => {
-        const buf = await bokioDownload(`${cbase(a.companyId)}/sie/${a.fiscalYearId}/download`);
-        if (a.savePath) {
-            const target = downloadTarget(a.savePath);
-            await writeFile(target, buf);
-            return ok(`Wrote ${buf.length} bytes to ${target}`);
-        }
+        const path = `${cbase(a.companyId)}/sie/${a.fiscalYearId}/download`;
+        if (a.savePath) return saveDownload(path, a.savePath);
+        const buf = await bokioDownload(path);
         return ok(buf.toString("latin1").slice(0, 4000));
     },
 );
@@ -422,6 +459,152 @@ tool(
         ),
 );
 
+tool(
+    "bokio_download_invoice",
+    "Download a published invoice as PDF to savePath.",
+    { invoiceId: z.string(), companyId, savePath: z.string() },
+    async (a) => saveDownload(`${cbase(a.companyId)}/invoices/${a.invoiceId}/download`, a.savePath),
+);
+
+tool(
+    "bokio_list_invoice_payments",
+    "List payments registered on an invoice.",
+    { invoiceId: z.string(), companyId, page, pageSize, query },
+    async (a) =>
+        okStructured(
+            await bokioRequest({
+                path: `${cbase(a.companyId)}/invoices/${a.invoiceId}/payments`,
+                query: paging(a),
+            }),
+        ),
+    listOutput,
+);
+
+tool(
+    "bokio_list_invoice_settlements",
+    "List settlements (currency differences, bank and payment-service fees) on an invoice.",
+    { invoiceId: z.string(), companyId, page, pageSize, query },
+    async (a) =>
+        okStructured(
+            await bokioRequest({
+                path: `${cbase(a.companyId)}/invoices/${a.invoiceId}/settlements`,
+                query: paging(a),
+            }),
+        ),
+    listOutput,
+);
+
+tool(
+    "bokio_create_invoice_settlement",
+    "Register a settlement on an invoice: currency difference, bank fee or payment-service fee (needs vatScheme). WRITE.",
+    { invoiceId: z.string(), companyId, settlement: settlementBody },
+    async (a) => {
+        const { type, ...details } = a.settlement;
+        return ok(
+            await bokioRequest({
+                method: "POST",
+                path: `${cbase(a.companyId)}/invoices/${a.invoiceId}/settlements`,
+                body: { type, invoiceSettlementDetails: details },
+            }),
+        );
+    },
+);
+
+// ---- credit notes ----------------------------------------------------------
+
+tool(
+    "bokio_list_credit_notes",
+    "List credit notes (kreditfakturor).",
+    { companyId, page, pageSize, query },
+    async (a) =>
+        okStructured(
+            await bokioRequest({ path: `${cbase(a.companyId)}/credit-notes`, query: paging(a) }),
+        ),
+    listOutput,
+);
+
+tool(
+    "bokio_get_credit_note",
+    "Get a credit note by id.",
+    { creditNoteId: z.string(), companyId },
+    async (a) =>
+        ok(await bokioRequest({ path: `${cbase(a.companyId)}/credit-notes/${a.creditNoteId}` })),
+);
+
+tool(
+    "bokio_download_credit_note",
+    "Download a published credit note as PDF to savePath.",
+    { creditNoteId: z.string(), companyId, savePath: z.string() },
+    async (a) =>
+        saveDownload(`${cbase(a.companyId)}/credit-notes/${a.creditNoteId}/download`, a.savePath),
+);
+
+tool(
+    "bokio_create_credit_note",
+    "Create a draft credit note that credits an invoice. Edit it with bokio_update_credit_note, then publish. WRITE.",
+    { invoiceId: z.string(), companyId },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                method: "POST",
+                path: `${cbase(a.companyId)}/invoices/${a.invoiceId}/credit`,
+            }),
+        ),
+);
+
+tool(
+    "bokio_update_credit_note",
+    "Update a draft credit note. Required: currency, creditDate, dueDate, lineItems. WRITE.",
+    { creditNoteId: z.string(), companyId, creditNote: creditNoteBody },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                method: "PUT",
+                path: `${cbase(a.companyId)}/credit-notes/${a.creditNoteId}`,
+                body: { ...a.creditNote, id: a.creditNoteId },
+            }),
+        ),
+);
+
+tool(
+    "bokio_publish_credit_note",
+    "Publish a draft credit note. WRITE.",
+    { creditNoteId: z.string(), companyId },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                method: "POST",
+                path: `${cbase(a.companyId)}/credit-notes/${a.creditNoteId}/publish`,
+            }),
+        ),
+);
+
+tool(
+    "bokio_record_credit_note",
+    "Record (bokför) a credit note. WRITE.",
+    { creditNoteId: z.string(), companyId },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                method: "POST",
+                path: `${cbase(a.companyId)}/credit-notes/${a.creditNoteId}/record`,
+            }),
+        ),
+);
+
+tool(
+    "bokio_delete_credit_note",
+    "Delete a draft credit note. WRITE.",
+    { creditNoteId: z.string(), companyId },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                method: "DELETE",
+                path: `${cbase(a.companyId)}/credit-notes/${a.creditNoteId}`,
+            }),
+        ),
+);
+
 // ---- customers -------------------------------------------------------------
 
 tool(
@@ -549,12 +732,7 @@ tool(
     "bokio_download_upload",
     "Download an uploaded file's data to savePath.",
     { uploadId: z.string(), companyId, savePath: z.string() },
-    async (a) => {
-        const buf = await bokioDownload(`${cbase(a.companyId)}/uploads/${a.uploadId}/download`);
-        const target = downloadTarget(a.savePath);
-        await writeFile(target, buf);
-        return ok(`Wrote ${buf.length} bytes to ${target}`);
-    },
+    async (a) => saveDownload(`${cbase(a.companyId)}/uploads/${a.uploadId}/download`, a.savePath),
 );
 
 // ---- raw escape hatch ------------------------------------------------------

@@ -105,9 +105,11 @@ describe("downloadTarget", () => {
         process.env = { ...saved };
     });
 
-    it("resolves to an absolute path when no download dir is set", () => {
+    it("confines to the working directory when no download dir is set (Downloads stay in the working directory by default)", () => {
         delete process.env.BOKIO_DOWNLOAD_DIR;
         expect(downloadTarget("foo.sie")).toBe(resolve("foo.sie"));
+        expect(() => downloadTarget("/etc/passwd")).toThrow(/working directory/);
+        expect(() => downloadTarget("../escape.sie")).toThrow(/working directory/);
     });
 
     it("confines within BOKIO_DOWNLOAD_DIR", () => {

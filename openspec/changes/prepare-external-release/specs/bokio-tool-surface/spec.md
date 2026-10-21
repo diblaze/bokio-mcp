@@ -49,12 +49,22 @@ The system SHALL provide tools to list and get bank payments created by the inte
 - **THEN** every bank-payment tool is read-only and no tool creates bank payments
 
 ### Requirement: Downloads validate the save path before any network request
-The system SHALL resolve and validate the local save path of every download tool (SIE, upload, invoice PDF, credit-note PDF) before contacting Bokio, and SHALL reject paths that escape the configured download directory.
+The system SHALL resolve and validate the local save path of every download tool (SIE, upload, invoice PDF, credit-note PDF) before contacting Bokio, SHALL reject paths that escape the configured download directory, and SHALL NOT overwrite an existing file.
 
 #### Scenario: Traversing save path makes no request
 - **GIVEN** a download directory is configured
 - **WHEN** a download tool is called with a save path that escapes that directory
 - **THEN** the tool returns an error naming the directory and no HTTP request is made
+
+#### Scenario: Existing file is not overwritten
+- **GIVEN** a file already exists at the resolved save path
+- **WHEN** a download tool is called with that save path
+- **THEN** the tool returns an error, the file is unchanged and no HTTP request is made
+
+#### Scenario: Write bodies match the Bokio request shape
+- **GIVEN** writes are enabled
+- **WHEN** a settlement is created or a credit note is updated
+- **THEN** the settlement is sent as `{type, invoiceSettlementDetails}` and the credit-note update carries the credit note's `id`
 
 ### Requirement: List inputs respect Bokio's pagination bounds
 The system SHALL reject a page size above 100 before making a request, and SHALL accept a filter query on every list tool whose endpoint supports one.
