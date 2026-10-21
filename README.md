@@ -12,7 +12,7 @@ Built for driving a Swedish AB's books alongside a YNAB budget. Read-only by def
 
 ## Prerequisites
 
-1. A Bokio private API token: **Bokio → Inställningar → API Tokens** (free up to 5,000 requests/month).
+1. A Bokio private integration token: **Bokio → [Integrations](https://app.bokio.se/integrations) → Create integration → copy token**. Limits: 5,000 requests per company per month, 200 per minute.
 2. Your company id — copy it from the Bokio browser URL (`.../companies/<companyId>/...`).
 3. Node.js ≥ 22.13 and [pnpm](https://pnpm.io) (`corepack enable`).
 
