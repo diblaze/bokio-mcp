@@ -1,4 +1,4 @@
-<!-- Generated: 2026-07-19 | Updated: 2026-07-19 -->
+<!-- Generated: 2026-07-19 | Updated: 2026-10-21 -->
 
 # bokio-mcp
 
@@ -14,7 +14,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `src/sie.ts` | SIE 4 export parser (PC8/CP437, `#RAR 0`, annulment pairs) and the pure öre computations behind the computed tools. |
 | `src/bokio.ts` | HTTP client + config: `bokioRequest` (JSON, enforces the write gate), `bokioDownload` (binary GET), `fileForm`, `filterQuery`, `resolveCompanyId`, `writesAllowed`, `downloadTarget`. |
 | `test/bokio.test.ts` | Unit tests (mocked `fetch`) for the client, write gate, filterQuery, downloadTarget. |
-| `test/server.test.ts` | In-memory `Client↔Server` test: asserts all tools register with explicit annotations. |
+| `test/server.test.ts` | In-memory `Client↔Server` test: asserts all tools register with explicit annotations; computed tools against a mocked fiscal-year listing + SIE download. |
+| `test/sie.test.ts` | Parser and computation tests on synthetic SIE built in the file. |
 | `scripts/smoke.mjs` | Spawns built `dist/index.js` directly and through a symlink (as npm installs bins), runs the MCP handshake + `tools/list`, asserts read-only surface (writes hidden, all annotated). Run via `pnpm run smoke`. |
 | `scripts/pack-check.mjs` | `npm pack --dry-run`: tarball holds only `dist/`, README, LICENSE, `package.json`. Run via `pnpm run pack:check` (CI). |
 | `biome.json` | Biome config: 4-space, 100 cols, double quotes, semicolons, organize-imports. |
@@ -31,11 +32,22 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `scripts/` | `smoke.mjs` MCP-handshake check, `pack-check.mjs` tarball contents check |
 | `.github/` | CI workflow + CODEOWNERS |
 
+## Coding standard
+- Stack: TypeScript 5 (ESM; runtime Node ≥ 22, development ≥ 22.13 for pnpm 11) — MCP SDK ^1.29, Context7 `/modelcontextprotocol/typescript-sdk` (version `v1.29.0`); zod ^4, Context7 `/colinhacks/zod`. Bokio API: OpenAPI `bokio/bokio-api` branch `v1`, `api-specification/company-api.yaml`.
+- Package manager: pnpm (lockfile `pnpm-lock.yaml`). Never npm/yarn (npm only for the owner's `npm publish`).
+- Check: `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check` — green before commit. CI: `.github/workflows/ci.yml` (Node 22 + 24).
+- Format/lint: Biome, `biome.json` is law. Run `pnpm run format` before commit.
+- Tests: vitest, `test/*.test.ts`. Public surface only: tools through the in-memory client, pure functions from `src/sie.ts`/`src/bokio.ts`; `fetch` stubbed (`vi.stubGlobal`) as the only trust-boundary stub; no live Bokio calls. Test names end with the spec scenario name in parentheses. Bare `.skip`/`.only` is a blocker.
+- Style: money is integer öre inside, kronor (`ore / 100`) only at the output edge, never float sums. Every tool goes through `tool()`; a tool with an output shape returns `okStructured(...)`. Ids in URL paths use `idParam`. New behaviour lands with an OpenSpec change (`openspec/changes/`) and is folded into `openspec/specs/` in the PR.
+- Language: code, docs, commits English.
+- Tracking: GitHub Issues. Labels `type:bug|feat|chore`. Deps via `--blocked-by`. Ready queue: `gh issue list --search '-is:blocked is:open'`. Commits close with `Closes #n`.
+- Don't: put real accounting data, company ids, org numbers, names or amounts anywhere (public repo; fixtures are invented). Don't add a mutating tool without `WRITE.` in its description. Don't expose bank-payment creation.
+
 ## For AI Agents
 
 ### Working In This Directory
 
-- **Package manager is pnpm only** (`packageManager: pnpm@11.9.0`), which requires **Node ≥ 22.13**. Never use npm/yarn. `corepack enable` first.
+- **Package manager is pnpm only** (`packageManager: pnpm@11.9.0`), which requires **Node ≥ 22.13** to develop (users only need Node ≥ 22). Never use npm/yarn. `corepack enable` first.
 - **Lint/format is Biome, 4-space.** Run `pnpm run format` (writes) / `pnpm run lint` (checks). CI runs `pnpm exec biome ci` and it must be clean.
 - **`main` is branch-protected**: external changes need a PR with green CI (`build (22)`, `build (24)`) + 1 approval (CODEOWNERS @diblaze). The owner has admin bypass.
 - Publishing to npm is an owner step after the release commit lands on `main`; agents never run `npm publish`. Bump `version` in `package.json` only (the server reads it at startup) and add a `CHANGELOG.md` entry.
@@ -46,9 +58,9 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 All tools are registered through the `tool(name, description, shape, handler)` helper in `src/index.ts`. It derives behavior from conventions — follow them exactly:
 
 - **Write tools MUST contain `WRITE.` in their description string.** That single token drives two things: (1) the tool is *not registered at all* when `BOKIO_ALLOW_WRITES` is off (#3), and (2) it gets `readOnlyHint:false`. Read tools omit it and get `readOnlyHint:true`.
-- Annotation hints are derived from the **tool name**: names matching `/reverse|delete/` get `destructiveHint:true`; `/update/` get `idempotentHint:true`. Name new tools accordingly.
+- Annotation hints are derived from the **tool name**: names matching `/reverse|delete|publish|record|update_supplier_invoice/` get `destructiveHint:true`; `/update/` get `idempotentHint:true`. Name new tools accordingly.
 - All mutations MUST go through `bokioRequest` with a non-GET `method` — never call `fetch` directly for writes. `bokioRequest` is the single choke point that enforces the `BOKIO_ALLOW_WRITES` gate; annotations are hints only, not security.
-- Downloads use `bokioDownload` (GET, no gate). File writes go through `downloadTarget()` (confines to `BOKIO_DOWNLOAD_DIR`, rejects traversal).
+- Downloads use `bokioDownload` (GET, no gate). File writes go through `saveDownload()` → `downloadTarget()` (confines to `BOKIO_DOWNLOAD_DIR`, else the working directory; rejects traversal; never overwrites).
 - Secrets: the token is read lazily from `BOKIO_TOKEN` and sent only as a Bearer header. Never log it or write to stdout (stdout is the JSON-RPC channel; use stderr).
 
 ### Testing Requirements
@@ -60,14 +72,16 @@ pnpm run typecheck
 pnpm test          # vitest: mocked fetch + in-memory server
 pnpm run build
 pnpm run smoke     # spawns dist/index.js, MCP handshake
+pnpm run pack:check
 ```
 When adding a tool, the `test/server.test.ts` count assertion (`expect(tools.length).toBe(60)`) and the smoke `forbidden`/`required` lists may need updating.
 
 ### Common Patterns
 
 - `tool()` wraps every handler in try/catch and returns `{ isError: true }` — handlers throw freely.
-- `ok(data)` formats a text result; `cbase(companyId)` builds `/companies/{id}` with `resolveCompanyId` fallback to `BOKIO_COMPANY_ID`.
-- Shared zod fragments (`companyId`, `page`, `pageSize`, `query`, `passthrough`) are defined once and reused.
+- `ok(data)` formats a text result; `okStructured(data)` adds `structuredContent` (required when the tool declares an output shape); `cbase(companyId)` builds `/companies/{id}` with `resolveCompanyId` fallback to `BOKIO_COMPANY_ID`.
+- Shared zod fragments (`companyId`, `idParam`, `page`, `pageSize`, `query`, `isoDay`) are defined once and reused.
+- Computed tools: `loadYears(companyId, {fiscalYearId?, from, to})` lists fiscal years once (skipped when an id is given), downloads each overlapping SIE export and parses it with `parseSie`; the arithmetic lives in `src/sie.ts`.
 
 ## Dependencies
 
