@@ -43,3 +43,6 @@ jobs:
 
       - name: Smoke (MCP handshake)
         run: pnpm run smoke
+
+      - name: Package contents
+        run: pnpm run pack:check
