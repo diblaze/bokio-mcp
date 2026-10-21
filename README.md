@@ -1,30 +1,29 @@
 # bokio-mcp
 
 [![CI](https://github.com/diblaze/bokio-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/diblaze/bokio-mcp/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/bokio-mcp)](https://www.npmjs.com/package/bokio-mcp)
 
-Model Context Protocol server for the [Bokio](https://www.bokio.se/) accounting API.
+An MCP server for the [Bokio](https://www.bokio.se/) accounting API. Connect it to Claude or any other MCP client and you can ask about your books in plain language: what is on the bank account at a given date, which customer invoices are still unpaid, what the VAT for last quarter adds up to, whether anything has been booked twice.
 
-- **Auth:** private integration token, one per company, created by each user in Bokio. OAuth (public integrations) is a possible future addition.
-- **Scope:** journal entries, invoices, credit notes, customers, suppliers, supplier invoices, items, uploads, bank payments (read-only), chart of accounts, fiscal years, SIE export.
-- **Safety:** all write operations are blocked unless `BOKIO_ALLOW_WRITES=1`.
+It is built for small companies and consultants who keep their own books in Bokio. By default it only reads: write tools stay hidden until you turn them on, so it is safe to point at live accounting data.
 
-For small companies and consultants who keep their own books in Bokio. Read-only by default, so it is safe to point at live accounting data.
+## What it covers
 
-## Prerequisites
+The server wraps the Bokio API for one company: journal entries, invoices, credit notes, customers, suppliers, supplier invoices, items, uploads, bank payments (read only), chart of accounts, fiscal years and the SIE export.
 
-1. A Bokio private integration token: **Bokio → [Integrations](https://app.bokio.se/integrations) → Create integration → copy token**. Limits: 5,000 requests per company per month, 200 per minute.
-2. Your company id — copy it from the Bokio browser URL (`.../companies/<companyId>/...`).
-3. Node.js ≥ 22.
+It also has computed tools that work on the SIE export: balances at a date, a ledger for one account, VAT and profit and loss for a period, open items, possible double bookings, and reconciliation against a bank statement. The server does that arithmetic in whole öre and hands the client finished numbers, so the same question gives the same answer every time.
 
-## Quick start
+## Before you start
 
-The server runs straight from npm, no clone needed:
+You need three things:
 
-```bash
-npx -y bokio-mcp
-```
+1. A Bokio private integration token. In Bokio, go to [Integrations](https://app.bokio.se/integrations), create an integration and copy the token. Bokio allows 5,000 requests per company per month and 200 per minute.
+2. Your company id. It is in the Bokio URL: `.../companies/<companyId>/...`.
+3. Node.js 22 or later.
 
-It speaks MCP over stdio, so you normally let your MCP client start it.
+## Install
+
+The server runs straight from npm, with no clone needed. It speaks MCP over stdio, so your MCP client starts it for you.
 
 ### Claude Code
 
@@ -37,7 +36,7 @@ claude mcp add --transport stdio --scope user \
 
 ### Claude Desktop and other MCP clients
 
-Add to the client's `mcpServers` config (Claude Desktop: `claude_desktop_config.json`):
+Add this to the client's `mcpServers` config (for Claude Desktop, `claude_desktop_config.json`):
 
 ```json
 {
@@ -48,6 +47,7 @@ Add to the client's `mcpServers` config (Claude Desktop: `claude_desktop_config.
       "env": {
         "BOKIO_TOKEN": "your_token",
         "BOKIO_COMPANY_ID": "your_company_id",
+        "BOKIO_DOWNLOAD_DIR": "/path/for/downloads",
         "BOKIO_ALLOW_WRITES": ""
       }
     }
@@ -55,23 +55,27 @@ Add to the client's `mcpServers` config (Claude Desktop: `claude_desktop_config.
 }
 ```
 
-Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you intend to change the books.
+Keep the token out of files you commit or share. Clients that support it, such as Claude Code, can read `${BOKIO_TOKEN}` from your shell environment instead.
 
-> Keep the token out of files you commit or share. Clients that support it (such as Claude Code) can expand `${BOKIO_TOKEN}` from your shell environment instead.
+### Configuration
 
-## Environment
-
-| Var | Required | Purpose |
+| Variable | Required | Purpose |
 |-----|----------|---------|
-| `BOKIO_TOKEN` | yes (at call time) | Private Bearer token |
-| `BOKIO_COMPANY_ID` | default company | Omit a tool's `companyId` to use this |
-| `BOKIO_ALLOW_WRITES` | no | `1`/`true`/`yes`/`on` enables writes; otherwise blocked |
-| `BOKIO_DOWNLOAD_DIR` | recommended | Directory for SIE, PDF and upload downloads. Without it, downloads are confined to the server's working directory (for Claude Desktop that is often `/`, so set this). Paths outside are rejected; existing files are never overwritten |
+| `BOKIO_TOKEN` | yes, when a tool is called | Private Bearer token |
+| `BOKIO_COMPANY_ID` | default company | Used when a tool call leaves out `companyId` |
+| `BOKIO_ALLOW_WRITES` | no | `1`, `true`, `yes` or `on` enables write tools; anything else keeps them hidden and blocked |
+| `BOKIO_DOWNLOAD_DIR` | recommended | Where SIE, PDF and upload downloads are saved. Without it, downloads go to the server's working directory, which for Claude Desktop is often `/`. Paths outside the directory are rejected and existing files are never overwritten |
 | `BOKIO_BASE_URL` | no | Defaults to `https://api.bokio.se/v1` |
+
+## Reading and writing
+
+Set `BOKIO_ALLOW_WRITES=1` when you want the server to create or change things in Bokio, and leave it empty the rest of the time. Write tools are marked *(write)* below.
+
+Bank payments are read only on purpose. Creating one would move money once it is signed with BankID, so the server does not offer it.
 
 ## Tools
 
-**Meta:** `bokio_company_info`, `bokio_list_fiscal_years`, `bokio_get_fiscal_year`, `bokio_chart_of_accounts`, `bokio_get_account`, `bokio_download_sie`
+**Company and ledger:** `bokio_company_info`, `bokio_list_fiscal_years`, `bokio_get_fiscal_year`, `bokio_chart_of_accounts`, `bokio_get_account`, `bokio_download_sie`
 
 **Journal:** `bokio_list_journal_entries` (`from`/`to`/`query`), `bokio_get_journal_entry`, `bokio_create_journal_entry` *(write)*, `bokio_reverse_journal_entry` *(write)*
 
@@ -89,16 +93,24 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 
 **Uploads:** `bokio_list_uploads`, `bokio_get_upload`, `bokio_upload_file` *(write)*, `bokio_download_upload`
 
-**Bank payments (read-only):** `bokio_list_bank_payments`, `bokio_get_bank_payment`. Bokio only returns payments created by the same integration. Creating payments is deliberately not exposed: they move money once signed with BankID.
+**Bank payments:** `bokio_list_bank_payments`, `bokio_get_bank_payment`. Bokio only returns payments created by the same integration.
 
-**Computed (read-only, from the SIE export):** `bokio_account_balances`, `bokio_account_ledger`, `bokio_find_duplicates`, `bokio_reconcile_bank` (pass your bank statement as `{date, amount, text}` rows), `bokio_vat_summary` (account totals only, not mapped to VAT-return boxes), `bokio_profit_and_loss`, `bokio_open_items` (works when revenue is booked as manual journal entries, not only through the invoice module). The server downloads the SIE export of each fiscal year involved (one request per year), parses it and does the arithmetic in whole öre, so answers are exact and repeatable. Amounts are in ledger sign: debit positive, credit negative. A verification and its `Annullering av …` reversal cancel out.
+**Computed:** `bokio_account_balances`, `bokio_account_ledger`, `bokio_find_duplicates`, `bokio_reconcile_bank` (pass your bank statement as `{date, amount, text}` rows), `bokio_vat_summary` (account totals, not mapped to VAT-return boxes), `bokio_profit_and_loss`, `bokio_open_items` (also works when revenue is booked as manual journal entries instead of through the invoice module). Each call downloads the SIE export for the fiscal years it needs, one request per year. Amounts are in ledger sign, debit positive and credit negative, and a verification cancels out against its `Annullering av …` reversal.
 
-**Escape hatch:** `bokio_raw_get` — GET any Bokio path (read-only).
+**Anything else:** `bokio_raw_get` sends a GET to any Bokio path.
 
-## Notes
+## Limits
 
-- Journal entries are double-entry: debit total must equal credit total.
-- SIE download is handy for reconciling the ledger against another system.
-- Not wrapped yet: tag groups, projects, journal-entry comments and tags, invoice attachments. Read them with `bokio_raw_get`.
-- API reference: <https://docs.bokio.se> · specs: <https://github.com/bokio/bokio-api>
-- Building from source and pull requests: [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md). Changes: [CHANGELOG.md](CHANGELOG.md).
+- Journal entries are double entry, so the debit total must equal the credit total.
+- Tag groups, projects, journal-entry comments and tags, and invoice attachments have no tools yet. Read them with `bokio_raw_get`.
+- Bokio's API reference is at <https://docs.bokio.se> and the OpenAPI specs at <https://github.com/bokio/bokio-api>.
+
+## Contributing
+
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers building from source, running the tests and the smoke check, and what a pull request needs. In short: commits follow [Conventional Commits](https://www.conventionalcommits.org), `pnpm install` sets up git hooks that check formatting and commit messages, and CI has to pass on Node 22 and 24 before a maintainer reviews. Adding a tool has its own checklist in the same file.
+
+Report security issues privately as described in [SECURITY.md](SECURITY.md), not in a public issue. Release notes are in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE)
