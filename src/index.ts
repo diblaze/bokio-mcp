@@ -66,7 +66,9 @@ function tool(
     const annotations = isWrite
         ? {
               readOnlyHint: false,
-              destructiveHint: /reverse|delete/.test(name),
+              // Not undoable via the API: publish locks + numbers a document, record
+              // posts to the ledger, update_supplier_invoice drops omitted line items.
+              destructiveHint: /reverse|delete|publish|record|update_supplier_invoice/.test(name),
               idempotentHint: /update/.test(name),
               openWorldHint: true,
           }
@@ -201,6 +203,47 @@ export const settlementBody = z
         message: "vatScheme is required for paymentServiceFee and not allowed otherwise",
         path: ["vatScheme"],
     });
+
+export const supplierBody = z
+    .object({
+        name: z.string(),
+        orgNumber: z.string().optional(),
+        vatNumber: z.string().optional(),
+        currency: z.string().optional(),
+        address: addressSchema.partial().optional(),
+        paymentDetails: z
+            .discriminatedUnion("type", [
+                z.object({ type: z.literal("bankgiro"), bankgiroNumber: z.string() }),
+                z.object({ type: z.literal("plusgiro"), plusgiroNumber: z.string() }),
+                z.object({
+                    type: z.literal("transfer"),
+                    clearingNumber: z.string(),
+                    accountNumber: z.string(),
+                }),
+                z.object({
+                    type: z.literal("internationalPayment"),
+                    iban: z.string(),
+                    bic: z.string(),
+                }),
+            ])
+            .optional(),
+    })
+    .catchall(z.unknown());
+
+export const supplierInvoiceBody = z
+    .object({
+        supplierRef: z.object({ id: z.string() }),
+        invoiceNumber: z.string().optional(),
+        invoiceDate: z.string().describe("YYYY-MM-DD"),
+        dueDate: z.string().describe("YYYY-MM-DD"),
+        totalAmount: z.number(),
+        uploadRef: z.object({ id: z.string() }).optional().describe("Attach an existing upload"),
+        lineItems: z
+            .array(z.record(z.string(), z.unknown()))
+            .optional()
+            .describe("Preview field in Bokio; may change"),
+    })
+    .catchall(z.unknown());
 
 function paging(args: { page?: number; pageSize?: number; query?: string }): Query {
     return { page: args.page, pageSize: args.pageSize ?? 100, query: args.query };
@@ -601,6 +644,116 @@ tool(
             await bokioRequest({
                 method: "DELETE",
                 path: `${cbase(a.companyId)}/credit-notes/${a.creditNoteId}`,
+            }),
+        ),
+);
+
+// ---- suppliers -------------------------------------------------------------
+
+tool(
+    "bokio_list_suppliers",
+    "List suppliers (leverantörer).",
+    { companyId, page, pageSize, query },
+    async (a) =>
+        okStructured(
+            await bokioRequest({ path: `${cbase(a.companyId)}/suppliers`, query: paging(a) }),
+        ),
+    listOutput,
+);
+
+tool(
+    "bokio_get_supplier",
+    "Get a supplier by id.",
+    { supplierId: z.string(), companyId },
+    async (a) =>
+        ok(await bokioRequest({ path: `${cbase(a.companyId)}/suppliers/${a.supplierId}` })),
+);
+
+tool(
+    "bokio_create_supplier",
+    "Create a supplier. Required: name. WRITE.",
+    { companyId, supplier: supplierBody },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                method: "POST",
+                path: `${cbase(a.companyId)}/suppliers`,
+                body: a.supplier,
+            }),
+        ),
+);
+
+tool(
+    "bokio_update_supplier",
+    "Update a supplier. WRITE.",
+    { supplierId: z.string(), companyId, supplier: supplierBody },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                method: "PUT",
+                path: `${cbase(a.companyId)}/suppliers/${a.supplierId}`,
+                body: a.supplier,
+            }),
+        ),
+);
+
+tool(
+    "bokio_list_supplier_invoices",
+    "List supplier invoices (leverantörsfakturor).",
+    { companyId, page, pageSize, query },
+    async (a) =>
+        okStructured(
+            await bokioRequest({
+                path: `${cbase(a.companyId)}/supplier-invoices`,
+                query: paging(a),
+            }),
+        ),
+    listOutput,
+);
+
+tool(
+    "bokio_get_supplier_invoice",
+    "Get a supplier invoice by id.",
+    { supplierInvoiceId: z.string(), companyId },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                path: `${cbase(a.companyId)}/supplier-invoices/${a.supplierInvoiceId}`,
+            }),
+        ),
+);
+
+tool(
+    "bokio_create_supplier_invoice",
+    "Create a supplier invoice. Required: supplierRef.id, invoiceDate, dueDate, totalAmount. WRITE.",
+    { companyId, supplierInvoice: supplierInvoiceBody },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                method: "POST",
+                path: `${cbase(a.companyId)}/supplier-invoices`,
+                body: a.supplierInvoice,
+            }),
+        ),
+);
+
+tool(
+    "bokio_update_supplier_invoice",
+    "Update a supplier invoice. Line items left out of lineItems are removed. WRITE.",
+    {
+        supplierInvoiceId: z.string(),
+        companyId,
+        // .catchall would still pass uploadRef through; Bokio's update schema has none.
+        supplierInvoice: supplierInvoiceBody
+            .omit({ uploadRef: true })
+            .refine((b) => !("uploadRef" in b), "uploadRef is not accepted on update"),
+    },
+    async (a) =>
+        ok(
+            await bokioRequest({
+                method: "PUT",
+                path: `${cbase(a.companyId)}/supplier-invoices/${a.supplierInvoiceId}`,
+                body: a.supplierInvoice,
             }),
         ),
 );

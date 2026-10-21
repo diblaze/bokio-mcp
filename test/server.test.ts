@@ -14,7 +14,7 @@ describe("server tool surface", () => {
         await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 
         const { tools } = await client.listTools();
-        expect(tools.length).toBe(43);
+        expect(tools.length).toBe(51);
 
         // #6: every tool declares an explicit readOnlyHint boolean.
         for (const t of tools) {
@@ -244,6 +244,91 @@ describe("download and body shapes", () => {
         expect(body(1).id).toBe("cn");
         expect(String(f.mock.calls[1][0])).toContain("/credit-notes/cn");
         vi.unstubAllGlobals();
+        await client.close();
+    });
+});
+
+describe("suppliers", () => {
+    it("supplier bodies validate required fields (Supplier bodies validate required fields)", async () => {
+        const { supplierBody, supplierInvoiceBody } = await import("../src/index.js");
+        expect(supplierBody.safeParse({}).success).toBe(false);
+        expect(
+            supplierBody.safeParse({ name: "A", paymentDetails: { type: "bankgiro" } }).success,
+        ).toBe(false);
+        expect(
+            supplierBody.safeParse({
+                name: "A",
+                paymentDetails: { type: "bankgiro", bankgiroNumber: "123-4567" },
+            }).success,
+        ).toBe(true);
+        for (const [type, details] of [
+            ["plusgiro", { plusgiroNumber: "1234-5" }],
+            ["transfer", { clearingNumber: "1234", accountNumber: "567" }],
+            ["internationalPayment", { iban: "SE00", bic: "X" }],
+        ] as const) {
+            expect(
+                supplierBody.safeParse({ name: "A", paymentDetails: { type, ...details } }).success,
+            ).toBe(true);
+            expect(supplierBody.safeParse({ name: "A", paymentDetails: { type } }).success).toBe(
+                false,
+            );
+        }
+        const invoice = {
+            supplierRef: { id: "s" },
+            invoiceDate: "2026-01-01",
+            dueDate: "2026-01-31",
+            totalAmount: 100,
+        };
+        expect(supplierInvoiceBody.safeParse(invoice).success).toBe(true);
+        for (const field of Object.keys(invoice)) {
+            const { [field]: _, ...rest } = invoice as Record<string, unknown>;
+            expect(supplierInvoiceBody.safeParse(rest).success, field).toBe(false);
+        }
+    });
+});
+
+describe("supplier invoice update", () => {
+    it("update is destructive and does not advertise uploadRef (Supplier invoice update replaces line items)", async () => {
+        const client = await connect();
+        const { tools } = await client.listTools();
+        const update = tools.find((t) => t.name === "bokio_update_supplier_invoice");
+        expect(update?.annotations?.destructiveHint).toBe(true);
+        const props = (update?.inputSchema.properties?.supplierInvoice ?? {}) as {
+            properties?: Record<string, unknown>;
+        };
+        expect(props.properties).toHaveProperty("supplierRef");
+        expect(props.properties).not.toHaveProperty("uploadRef");
+
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        const f = vi.fn(async () => new Response("{}"));
+        vi.stubGlobal("fetch", f);
+        const res = await client.callTool({
+            name: "bokio_update_supplier_invoice",
+            arguments: {
+                supplierInvoiceId: "si",
+                supplierInvoice: {
+                    supplierRef: { id: "s" },
+                    invoiceDate: "2026-01-01",
+                    dueDate: "2026-01-31",
+                    totalAmount: 100,
+                    uploadRef: { id: "u" },
+                },
+            },
+        });
+        expect(res.isError).toBe(true);
+        expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+
+        // Irreversible actions are flagged so clients ask before running them.
+        for (const n of [
+            "bokio_publish_invoice",
+            "bokio_record_invoice",
+            "bokio_publish_credit_note",
+            "bokio_record_credit_note",
+        ]) {
+            expect(tools.find((t) => t.name === n)?.annotations?.destructiveHint, n).toBe(true);
+        }
         await client.close();
     });
 });

@@ -72,6 +72,10 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 
 **Credit notes:** `bokio_list_credit_notes`, `bokio_get_credit_note`, `bokio_download_credit_note` (PDF), `bokio_create_credit_note` *(write, from an invoice)*, `bokio_update_credit_note` *(write)*, `bokio_publish_credit_note` *(write)*, `bokio_record_credit_note` *(write)*, `bokio_delete_credit_note` *(write, drafts only)*
 
+**Suppliers:** `bokio_list_suppliers`, `bokio_get_supplier`, `bokio_create_supplier` *(write)*, `bokio_update_supplier` *(write)*
+
+**Supplier invoices:** `bokio_list_supplier_invoices`, `bokio_get_supplier_invoice`, `bokio_create_supplier_invoice` *(write)*, `bokio_update_supplier_invoice` *(write)*
+
 **Customers:** `bokio_list_customers`, `bokio_get_customer`, `bokio_create_customer` *(write)*, `bokio_update_customer` *(write)*
 
 **Items:** `bokio_list_items`, `bokio_get_item`, `bokio_create_item` *(write)*, `bokio_update_item` *(write)*
@@ -84,7 +88,7 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 
 - Journal entries are double-entry: debit total must equal credit total.
 - SIE download is great for reconciling the AB ledger against an external budget.
-- `[Preview]` Bokio endpoints (supplier-invoices, suppliers, tag-groups) are not yet wrapped; reach them via `bokio_raw_get`.
+- Not wrapped yet: tag groups, projects, journal-entry comments and tags, invoice attachments. Read them with `bokio_raw_get`.
 - API reference: <https://docs.bokio.se> · specs: <https://github.com/bokio/bokio-api>
 
 ## Contributing
