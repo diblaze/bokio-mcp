@@ -2,6 +2,13 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/). Entries from 0.4.0 on are generated from commit messages by release-please.
 
+## [0.4.0](https://github.com/diblaze/bokio-mcp/compare/v0.3.0...v0.4.0) (2026-10-21)
+
+
+### Added
+
+* **server:** send usage instructions at initialize ([8e7fbfa](https://github.com/diblaze/bokio-mcp/commit/8e7fbfab2dba59c5de84d9d887954b0039881c1d))
+
 ## 0.3.0 — 2026-10-21
 
 ### Added
