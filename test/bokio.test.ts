@@ -82,6 +82,12 @@ describe("config", () => {
         expect(resolveCompanyId()).toBe("env-co");
     });
 
+    it("resolveCompanyId rejects ids that would change the URL path", () => {
+        for (const bad of ["../x", "a/b", "a?b=c", ""]) {
+            expect(() => resolveCompanyId(bad || "x/")).toThrow(/plain id/);
+        }
+    });
+
     it("resolveCompanyId throws when nothing set", () => {
         delete process.env.BOKIO_COMPANY_ID;
         expect(() => resolveCompanyId()).toThrow(/companyId required/);

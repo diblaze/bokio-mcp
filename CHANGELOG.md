@@ -18,6 +18,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Error hints name Bokio's documented causes: Integrations page for 401, scope or monthly quota for 403, rate limit or concurrent write for 429.
 - The server reports the version from `package.json`.
 - Publish and record tools are marked destructive (they cannot be undone through the API), so MCP clients ask before running them.
+- Path ids (and `companyId`) must be plain ids; values with `/`, `?` or `..` are rejected before any request.
 - Downloads are always confined: to `BOKIO_DOWNLOAD_DIR`, or the working directory when it is unset.
 
 ### Fixed

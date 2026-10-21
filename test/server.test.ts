@@ -356,3 +356,23 @@ describe("distribution", () => {
         await client.close();
     });
 });
+
+describe("path ids", () => {
+    it("ids that would change the URL path are rejected before any request (Path ids cannot change the request path)", async () => {
+        const client = await connect();
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        const f = vi.fn(async () => new Response("{}"));
+        vi.stubGlobal("fetch", f);
+        for (const creditNoteId of ["../invoices/x", "x?y=z", ""]) {
+            const res = await client.callTool({
+                name: "bokio_delete_credit_note",
+                arguments: { creditNoteId },
+            });
+            expect(res.isError, creditNoteId).toBe(true);
+        }
+        expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+});

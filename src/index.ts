@@ -12,6 +12,7 @@ import {
     downloadTarget,
     fileForm,
     filterQuery,
+    ID_PATTERN,
     type Query,
     resolveCompanyId,
     tokenWarning,
@@ -92,8 +93,8 @@ function tool(
     });
 }
 
-const companyId = z
-    .string()
+const idParam = z.string().regex(ID_PATTERN, "expected a plain id (letters, digits, - or _)");
+const companyId = idParam
     .optional()
     .describe("Bokio company id. Defaults to BOKIO_COMPANY_ID if omitted.");
 const page = z.number().int().positive().optional().describe("Page number (1-based)");
@@ -281,7 +282,7 @@ tool(
 tool(
     "bokio_get_fiscal_year",
     "Get a single fiscal year by id.",
-    { fiscalYearId: z.string(), companyId },
+    { fiscalYearId: idParam, companyId },
     async (a) =>
         ok(await bokioRequest({ path: `${cbase(a.companyId)}/fiscal-years/${a.fiscalYearId}` })),
 );
@@ -310,7 +311,7 @@ tool(
 tool(
     "bokio_download_sie",
     "Download the SIE file for a fiscal year. Saves to savePath if given, else returns a text preview.",
-    { fiscalYearId: z.string(), companyId, savePath: z.string().optional() },
+    { fiscalYearId: idParam, companyId, savePath: z.string().optional() },
     async (a) => {
         const path = `${cbase(a.companyId)}/sie/${a.fiscalYearId}/download`;
         if (a.savePath) return saveDownload(path, a.savePath);
@@ -338,7 +339,7 @@ tool(
 tool(
     "bokio_get_journal_entry",
     "Get a journal entry by id.",
-    { journalEntryId: z.string(), companyId },
+    { journalEntryId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -384,7 +385,7 @@ tool(
 tool(
     "bokio_reverse_journal_entry",
     "Reverse (reversera) a journal entry. WRITE.",
-    { journalEntryId: z.string(), companyId },
+    { journalEntryId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -407,11 +408,8 @@ tool(
     listOutput,
 );
 
-tool(
-    "bokio_get_invoice",
-    "Get an invoice by id.",
-    { invoiceId: z.string(), companyId },
-    async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/invoices/${a.invoiceId}` })),
+tool("bokio_get_invoice", "Get an invoice by id.", { invoiceId: idParam, companyId }, async (a) =>
+    ok(await bokioRequest({ path: `${cbase(a.companyId)}/invoices/${a.invoiceId}` })),
 );
 
 tool(
@@ -431,7 +429,7 @@ tool(
 tool(
     "bokio_update_invoice",
     "Update an invoice. WRITE.",
-    { invoiceId: z.string(), companyId, invoice: invoiceBody },
+    { invoiceId: idParam, companyId, invoice: invoiceBody },
     async (a) =>
         ok(
             await bokioRequest({
@@ -445,7 +443,7 @@ tool(
 tool(
     "bokio_delete_invoice",
     "Delete an invoice. WRITE.",
-    { invoiceId: z.string(), companyId },
+    { invoiceId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -458,7 +456,7 @@ tool(
 tool(
     "bokio_publish_invoice",
     "Publish an invoice. WRITE.",
-    { invoiceId: z.string(), companyId },
+    { invoiceId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -471,7 +469,7 @@ tool(
 tool(
     "bokio_record_invoice",
     "Record (bokför) an invoice. WRITE.",
-    { invoiceId: z.string(), companyId },
+    { invoiceId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -485,7 +483,7 @@ tool(
     "bokio_create_invoice_payment",
     "Register a payment on an invoice. Required: date, sumBaseCurrency, bookkeepingAccountNumber. WRITE.",
     {
-        invoiceId: z.string(),
+        invoiceId: idParam,
         companyId,
         date: z.string().describe("YYYY-MM-DD"),
         sumBaseCurrency: z.number(),
@@ -508,14 +506,14 @@ tool(
 tool(
     "bokio_download_invoice",
     "Download a published invoice as PDF to savePath.",
-    { invoiceId: z.string(), companyId, savePath: z.string() },
+    { invoiceId: idParam, companyId, savePath: z.string() },
     async (a) => saveDownload(`${cbase(a.companyId)}/invoices/${a.invoiceId}/download`, a.savePath),
 );
 
 tool(
     "bokio_list_invoice_payments",
     "List payments registered on an invoice.",
-    { invoiceId: z.string(), companyId, page, pageSize, query },
+    { invoiceId: idParam, companyId, page, pageSize, query },
     async (a) =>
         okStructured(
             await bokioRequest({
@@ -529,7 +527,7 @@ tool(
 tool(
     "bokio_list_invoice_settlements",
     "List settlements (currency differences, bank and payment-service fees) on an invoice.",
-    { invoiceId: z.string(), companyId, page, pageSize, query },
+    { invoiceId: idParam, companyId, page, pageSize, query },
     async (a) =>
         okStructured(
             await bokioRequest({
@@ -543,7 +541,7 @@ tool(
 tool(
     "bokio_create_invoice_settlement",
     "Register a settlement on an invoice: currency difference, bank fee or payment-service fee (needs vatScheme). WRITE.",
-    { invoiceId: z.string(), companyId, settlement: settlementBody },
+    { invoiceId: idParam, companyId, settlement: settlementBody },
     async (a) => {
         const { type, ...details } = a.settlement;
         return ok(
@@ -572,7 +570,7 @@ tool(
 tool(
     "bokio_get_credit_note",
     "Get a credit note by id.",
-    { creditNoteId: z.string(), companyId },
+    { creditNoteId: idParam, companyId },
     async (a) =>
         ok(await bokioRequest({ path: `${cbase(a.companyId)}/credit-notes/${a.creditNoteId}` })),
 );
@@ -580,7 +578,7 @@ tool(
 tool(
     "bokio_download_credit_note",
     "Download a published credit note as PDF to savePath.",
-    { creditNoteId: z.string(), companyId, savePath: z.string() },
+    { creditNoteId: idParam, companyId, savePath: z.string() },
     async (a) =>
         saveDownload(`${cbase(a.companyId)}/credit-notes/${a.creditNoteId}/download`, a.savePath),
 );
@@ -588,7 +586,7 @@ tool(
 tool(
     "bokio_create_credit_note",
     "Create a draft credit note that credits an invoice. Edit it with bokio_update_credit_note, then publish. WRITE.",
-    { invoiceId: z.string(), companyId },
+    { invoiceId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -601,7 +599,7 @@ tool(
 tool(
     "bokio_update_credit_note",
     "Update a draft credit note. Required: currency, creditDate, dueDate, lineItems. WRITE.",
-    { creditNoteId: z.string(), companyId, creditNote: creditNoteBody },
+    { creditNoteId: idParam, companyId, creditNote: creditNoteBody },
     async (a) =>
         ok(
             await bokioRequest({
@@ -615,7 +613,7 @@ tool(
 tool(
     "bokio_publish_credit_note",
     "Publish a draft credit note. WRITE.",
-    { creditNoteId: z.string(), companyId },
+    { creditNoteId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -628,7 +626,7 @@ tool(
 tool(
     "bokio_record_credit_note",
     "Record (bokför) a credit note. WRITE.",
-    { creditNoteId: z.string(), companyId },
+    { creditNoteId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -641,7 +639,7 @@ tool(
 tool(
     "bokio_delete_credit_note",
     "Delete a draft credit note. WRITE.",
-    { creditNoteId: z.string(), companyId },
+    { creditNoteId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -664,12 +662,8 @@ tool(
     listOutput,
 );
 
-tool(
-    "bokio_get_supplier",
-    "Get a supplier by id.",
-    { supplierId: z.string(), companyId },
-    async (a) =>
-        ok(await bokioRequest({ path: `${cbase(a.companyId)}/suppliers/${a.supplierId}` })),
+tool("bokio_get_supplier", "Get a supplier by id.", { supplierId: idParam, companyId }, async (a) =>
+    ok(await bokioRequest({ path: `${cbase(a.companyId)}/suppliers/${a.supplierId}` })),
 );
 
 tool(
@@ -689,7 +683,7 @@ tool(
 tool(
     "bokio_update_supplier",
     "Update a supplier. WRITE.",
-    { supplierId: z.string(), companyId, supplier: supplierBody },
+    { supplierId: idParam, companyId, supplier: supplierBody },
     async (a) =>
         ok(
             await bokioRequest({
@@ -717,7 +711,7 @@ tool(
 tool(
     "bokio_get_supplier_invoice",
     "Get a supplier invoice by id.",
-    { supplierInvoiceId: z.string(), companyId },
+    { supplierInvoiceId: idParam, companyId },
     async (a) =>
         ok(
             await bokioRequest({
@@ -744,7 +738,7 @@ tool(
     "bokio_update_supplier_invoice",
     "Update a supplier invoice. Line items left out of lineItems are removed. WRITE.",
     {
-        supplierInvoiceId: z.string(),
+        supplierInvoiceId: idParam,
         companyId,
         // .catchall would still pass uploadRef through; Bokio's update schema has none.
         supplierInvoice: supplierInvoiceBody
@@ -778,7 +772,7 @@ tool(
 tool(
     "bokio_get_bank_payment",
     "Get a bank payment by id (only payments created by this integration; creation is deliberately not exposed).",
-    { bankPaymentId: z.string(), companyId },
+    { bankPaymentId: idParam, companyId },
     async (a) =>
         ok(await bokioRequest({ path: `${cbase(a.companyId)}/bank-payments/${a.bankPaymentId}` })),
 );
@@ -796,12 +790,8 @@ tool(
     listOutput,
 );
 
-tool(
-    "bokio_get_customer",
-    "Get a customer by id.",
-    { customerId: z.string(), companyId },
-    async (a) =>
-        ok(await bokioRequest({ path: `${cbase(a.companyId)}/customers/${a.customerId}` })),
+tool("bokio_get_customer", "Get a customer by id.", { customerId: idParam, companyId }, async (a) =>
+    ok(await bokioRequest({ path: `${cbase(a.companyId)}/customers/${a.customerId}` })),
 );
 
 tool(
@@ -821,7 +811,7 @@ tool(
 tool(
     "bokio_update_customer",
     "Update a customer. WRITE.",
-    { customerId: z.string(), companyId, customer: customerBody },
+    { customerId: idParam, companyId, customer: customerBody },
     async (a) =>
         ok(
             await bokioRequest({
@@ -843,7 +833,7 @@ tool(
     listOutput,
 );
 
-tool("bokio_get_item", "Get an item by id.", { itemId: z.string(), companyId }, async (a) =>
+tool("bokio_get_item", "Get an item by id.", { itemId: idParam, companyId }, async (a) =>
     ok(await bokioRequest({ path: `${cbase(a.companyId)}/items/${a.itemId}` })),
 );
 
@@ -854,7 +844,7 @@ tool("bokio_create_item", "Create an item. WRITE.", { companyId, item: itemBody 
 tool(
     "bokio_update_item",
     "Update an item. WRITE.",
-    { itemId: z.string(), companyId, item: itemBody },
+    { itemId: idParam, companyId, item: itemBody },
     async (a) =>
         ok(
             await bokioRequest({
@@ -881,7 +871,7 @@ tool(
 tool(
     "bokio_get_upload",
     "Get upload metadata by id.",
-    { uploadId: z.string(), companyId },
+    { uploadId: idParam, companyId },
     async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/uploads/${a.uploadId}` })),
 );
 
@@ -909,7 +899,7 @@ tool(
 tool(
     "bokio_download_upload",
     "Download an uploaded file's data to savePath.",
-    { uploadId: z.string(), companyId, savePath: z.string() },
+    { uploadId: idParam, companyId, savePath: z.string() },
     async (a) => saveDownload(`${cbase(a.companyId)}/uploads/${a.uploadId}/download`, a.savePath),
 );
 

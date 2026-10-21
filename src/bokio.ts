@@ -42,11 +42,15 @@ export function writesAllowed(): boolean {
     return v === "1" || v === "true" || v === "yes" || v === "on";
 }
 
+/** Ids are spliced into URL paths, so only plain id characters are allowed (no `/`, `?`, `..`). */
+export const ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 export function resolveCompanyId(companyId?: string): string {
     const cid = companyId ?? process.env.BOKIO_COMPANY_ID;
     if (!cid) {
         throw new Error("companyId required: pass it or set BOKIO_COMPANY_ID");
     }
+    if (!ID_PATTERN.test(cid)) throw new Error(`companyId is not a plain id: ${cid}`);
     return cid;
 }
 

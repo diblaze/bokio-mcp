@@ -104,3 +104,11 @@ The system SHALL combine filter conditions, including the `from`/`to` date bound
 - **GIVEN** a list call with a raw filter and from/to dates
 - **WHEN** the query string is built
 - **THEN** the conditions are joined with `&&`, not with the word `and`
+
+### Requirement: Path ids cannot change the request path
+The system SHALL accept only plain ids (letters, digits, `-`, `_`) for every id spliced into a request path, including `companyId` from arguments or `BOKIO_COMPANY_ID`, and SHALL reject anything else before any request.
+
+#### Scenario: Path ids cannot change the request path
+- **GIVEN** a tool that takes an id
+- **WHEN** it is called with an id containing `/`, `?`, `..` or nothing
+- **THEN** the tool returns an error and no HTTP request is made
