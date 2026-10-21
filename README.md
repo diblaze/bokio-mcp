@@ -82,6 +82,8 @@ Leave `BOKIO_ALLOW_WRITES` empty for read-only. Set it to `1` only when you inte
 
 **Uploads:** `bokio_list_uploads`, `bokio_get_upload`, `bokio_upload_file` *(write)*, `bokio_download_upload`
 
+**Bank payments (read-only):** `bokio_list_bank_payments`, `bokio_get_bank_payment`. Bokio only returns payments created by the same integration. Creating payments is deliberately not exposed: they move money once signed with BankID.
+
 **Escape hatch:** `bokio_raw_get` — GET any Bokio path (read-only).
 
 ## Notes
