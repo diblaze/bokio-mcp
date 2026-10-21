@@ -14,7 +14,7 @@ describe("server tool surface", () => {
         await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 
         const { tools } = await client.listTools();
-        expect(tools.length).toBe(55);
+        expect(tools.length).toBe(57);
 
         // #6: every tool declares an explicit readOnlyHint boolean.
         for (const t of tools) {
@@ -417,7 +417,12 @@ function mockBokio() {
     return f;
 }
 
-const COMPUTED = ["bokio_account_balances", "bokio_account_ledger"];
+const COMPUTED = [
+    "bokio_account_balances",
+    "bokio_account_ledger",
+    "bokio_find_duplicates",
+    "bokio_reconcile_bank",
+];
 
 describe("computed tools", () => {
     it("computed tools are read-only (Computed tools are listed as read-only)", async () => {
@@ -498,6 +503,35 @@ describe("computed tools", () => {
         });
         expect(res.isError).toBe(true);
         expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+
+    it("reconcile rejects empty rows (Empty bank rows are rejected)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        const res = await client.callTool({
+            name: "bokio_reconcile_bank",
+            arguments: { rows: [] },
+        });
+        expect(res.isError).toBe(true);
+        expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+
+    it("reconcile end to end over the mocked export", async () => {
+        const client = await connect();
+        mockBokio();
+        const res = await client.callTool({
+            name: "bokio_reconcile_bank",
+            arguments: { rows: [{ date: "2026-01-11", amount: -30 }] },
+        });
+        expect(res.structuredContent).toMatchObject({
+            account: 1930,
+            matched: [{ dayDiff: 1, ledger: { number: "1", amount: -30 } }],
+            difference: 0,
+        });
         vi.unstubAllGlobals();
         await client.close();
     });
