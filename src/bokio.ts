@@ -8,21 +8,20 @@ const TOKEN_HELP =
     "Bokio → Integrations (https://app.bokio.se/integrations) → Create integration → copy token";
 
 /**
- * Resolve a local download path. When BOKIO_DOWNLOAD_DIR is set, confine the
- * target inside it (reject path traversal); otherwise resolve to an absolute
- * path. Prevents an LLM-supplied savePath from clobbering arbitrary files.
+ * Resolve a local download path. Confine it inside BOKIO_DOWNLOAD_DIR when set,
+ * target inside it, else inside the working directory (reject path traversal).
+ * Prevents an LLM-supplied savePath from writing anywhere on disk.
  */
 export function downloadTarget(savePath: string): string {
     const dir = process.env.BOKIO_DOWNLOAD_DIR;
-    if (dir) {
-        const base = resolve(dir);
-        const target = resolve(base, savePath);
-        if (target !== base && !target.startsWith(base + sep)) {
-            throw new Error(`savePath escapes BOKIO_DOWNLOAD_DIR (${dir})`);
-        }
-        return target;
+    const base = resolve(dir ?? ".");
+    const target = resolve(base, savePath);
+    if (target === base || !target.startsWith(base + sep)) {
+        throw new Error(
+            `savePath escapes ${dir ? `BOKIO_DOWNLOAD_DIR (${dir})` : `the working directory (${base}); set BOKIO_DOWNLOAD_DIR`}`,
+        );
     }
-    return resolve(savePath);
+    return target;
 }
 
 function baseUrl(): string {

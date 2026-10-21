@@ -14,7 +14,7 @@ describe("server tool surface", () => {
         await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 
         const { tools } = await client.listTools();
-        expect(tools.length).toBe(31);
+        expect(tools.length).toBe(43);
 
         // #6: every tool declares an explicit readOnlyHint boolean.
         for (const t of tools) {
@@ -96,19 +96,153 @@ describe("write-body schemas (#2)", () => {
 
 describe("input bounds", () => {
     it("rejects pageSize above 100 without a request (pageSize above 100 is rejected before any request)", async () => {
-        const { server } = await import("../src/index.js");
-        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-        const client = new Client({ name: "test", version: "0" });
-        await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+        const client = await connect();
         process.env.BOKIO_TOKEN = "a".repeat(40);
         process.env.BOKIO_COMPANY_ID = "co";
         const f = vi.fn(async () => new Response("{}"));
         vi.stubGlobal("fetch", f);
-        const res = await client
-            .callTool({ name: "bokio_list_invoices", arguments: { pageSize: 101 } })
-            .catch(() => ({ isError: true }));
+        const res = await client.callTool({
+            name: "bokio_list_invoices",
+            arguments: { pageSize: 101 },
+        });
         expect(res.isError).toBe(true);
+        expect((res.content as { text: string }[])[0].text).toMatch(/too_big[\s\S]*pageSize/);
         expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+});
+
+async function connect() {
+    const { server } = await import("../src/index.js");
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test", version: "0" });
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    return client;
+}
+
+describe("credit notes, payments and settlements", () => {
+    it("credit note tools carry correct hints (Credit note tools registered with correct hints)", async () => {
+        const client = await connect();
+        const { tools } = await client.listTools();
+        const hints = new Map(tools.map((t) => [t.name, t.annotations]));
+        for (const n of [
+            "bokio_list_credit_notes",
+            "bokio_get_credit_note",
+            "bokio_download_credit_note",
+        ]) {
+            expect(hints.get(n)?.readOnlyHint).toBe(true);
+        }
+        expect(hints.get("bokio_update_credit_note")?.idempotentHint).toBe(true);
+        expect(hints.get("bokio_delete_credit_note")?.destructiveHint).toBe(true);
+        for (const n of [
+            "bokio_create_credit_note",
+            "bokio_publish_credit_note",
+            "bokio_record_credit_note",
+        ]) {
+            expect(hints.get(n)?.readOnlyHint).toBe(false);
+        }
+        await client.close();
+    });
+
+    it("settlement body validates type and details (Settlement body validates type and details)", async () => {
+        const { settlementBody } = await import("../src/index.js");
+        expect(
+            settlementBody.safeParse({ type: "badDebt", date: "2026-01-01", sumBaseCurrency: 10 })
+                .success,
+        ).toBe(false);
+        expect(
+            settlementBody.safeParse({
+                type: "paymentServiceFee",
+                date: "2026-01-01",
+                sumBaseCurrency: 10,
+            }).success,
+        ).toBe(false);
+        expect(
+            settlementBody.safeParse({ type: "bankFee", date: "2026-01-01", sumBaseCurrency: 10 })
+                .success,
+        ).toBe(true);
+    });
+
+    it("download with traversing savePath makes no request (Traversing save path makes no request)", async () => {
+        const client = await connect();
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        process.env.BOKIO_DOWNLOAD_DIR = "/tmp/bokio-dl";
+        const f = vi.fn(async () => new Response("pdf"));
+        vi.stubGlobal("fetch", f);
+        const res = await client.callTool({
+            name: "bokio_download_invoice",
+            arguments: { invoiceId: "x", savePath: "../out.pdf" },
+        });
+        expect(res.isError).toBe(true);
+        expect((res.content as { text: string }[])[0].text).toMatch(/escapes BOKIO_DOWNLOAD_DIR/);
+        expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        delete process.env.BOKIO_DOWNLOAD_DIR;
+        await client.close();
+    });
+});
+
+describe("download and body shapes", () => {
+    it("download refuses to overwrite an existing file (Existing file is not overwritten)", async () => {
+        const { mkdtempSync, writeFileSync, readFileSync } = await import("node:fs");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+        const dir = mkdtempSync(join(tmpdir(), "bokio-test-"));
+        writeFileSync(join(dir, "keep.pdf"), "original");
+        const client = await connect();
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        process.env.BOKIO_DOWNLOAD_DIR = dir;
+        const f = vi.fn(async () => new Response("pdf"));
+        vi.stubGlobal("fetch", f);
+        const res = await client.callTool({
+            name: "bokio_download_invoice",
+            arguments: { invoiceId: "x", savePath: "keep.pdf" },
+        });
+        expect(res.isError).toBe(true);
+        expect(readFileSync(join(dir, "keep.pdf"), "utf8")).toBe("original");
+        expect(f).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        delete process.env.BOKIO_DOWNLOAD_DIR;
+        await client.close();
+    });
+
+    it("settlement and credit-note bodies are sent in Bokio's shape (Write bodies match the Bokio request shape)", async () => {
+        const client = await connect();
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        const f = vi.fn(
+            async () => new Response("{}", { headers: { "content-type": "application/json" } }),
+        );
+        vi.stubGlobal("fetch", f);
+        const body = (i: number) => JSON.parse(String(f.mock.calls[i][1]?.body));
+        await client.callTool({
+            name: "bokio_create_invoice_settlement",
+            arguments: {
+                invoiceId: "inv",
+                settlement: { type: "bankFee", date: "2026-01-01", sumBaseCurrency: 10 },
+            },
+        });
+        expect(body(0)).toEqual({
+            type: "bankFee",
+            invoiceSettlementDetails: { date: "2026-01-01", sumBaseCurrency: 10 },
+        });
+        await client.callTool({
+            name: "bokio_update_credit_note",
+            arguments: {
+                creditNoteId: "cn",
+                creditNote: {
+                    currency: "SEK",
+                    creditDate: "2026-01-01",
+                    dueDate: "2026-01-31",
+                    lineItems: [{ description: "x" }],
+                },
+            },
+        });
+        expect(body(1).id).toBe("cn");
+        expect(String(f.mock.calls[1][0])).toContain("/credit-notes/cn");
         vi.unstubAllGlobals();
         await client.close();
     });
