@@ -37,13 +37,14 @@
 - [x] 2.12 Count 55 → 57 in `test/server.test.ts` and the three AGENTS files; CHANGELOG + README Computed block gain both tools; verify: `pnpm test`
 
 ## 3. VAT summary and profit and loss
-- [ ] 3.1 Failing test `test/sie.test.ts::vat summary per account` proves scenario "VAT and sales accounts are summed per account for the period"
-- [ ] 3.2 Failing test `test/sie.test.ts::vat totals from ranges` proves scenario "Totals derive from account ranges"
-- [ ] 3.3 Failing test `test/sie.test.ts::p&l by class` proves scenario "Result per class covers classes 3 to 8"
-- [ ] 3.4 Failing test `test/sie.test.ts::p&l by account` proves scenario "Grouping by account lists each account once"
-- [ ] 3.5 Failing test `test/sie.test.ts::p&l ignores balance accounts` proves scenario "Balance accounts are excluded"
-- [ ] 3.6 `src/sie.ts`: `periodSums(sies, from, to, pred)` shared by `vatSummary` (accounts 2610–2659 and 3000–3999; `outputVat = -Σ2610–2639`, `inputVat = Σ2640–2649`, `netVat = outputVat - inputVat`) and `profitAndLoss` (accounts 3000–8999; `groupBy "class" | "account"`; class names for 3–8 as a 6-entry constant; `result = -Σ`); verify: 3.1–3.5 pass
-- [ ] 3.7 `src/index.ts`: register `bokio_vat_summary` (`{ companyId, from, to }` → `{ from, to, accounts: [{account, name, amount}], outputVat, inputVat, netVat }`; description says "account totals only, no return boxes") and `bokio_profit_and_loss` (`{ companyId, from, to, groupBy = "class" }` → `{ from, to, rows: [{key, name, amount}], result }`); count → 59 in test and AGENTS files; CHANGELOG + README; verify: `pnpm test`
+- [x] 3.1 Failing test `test/sie.test.ts::vat summary per account` proves scenario "VAT and sales accounts are summed per account for the period"
+- [x] 3.2 Failing test `test/sie.test.ts::vat totals from ranges` proves scenario "Totals derive from account ranges"
+- [x] 3.3 Failing test `test/sie.test.ts::p&l by class` proves scenario "Result per class covers classes 3 to 8"
+- [x] 3.4 Failing test `test/sie.test.ts::p&l by account` proves scenario "Grouping by account lists each account once"
+- [x] 3.5 Failing test `test/sie.test.ts::p&l ignores balance accounts` proves scenario "Balance accounts are excluded"
+- [x] 3.5b Failing test `test/sie.test.ts::vat settlement left out` proves scenario "VAT settlement verification is left out"
+- [x] 3.6 `src/sie.ts`: `periodSums(sies, from, to, pred)` shared by `vatSummary` (accounts 2610–2659 and 3000–3999; `outputVat = -Σ2610–2639`, `inputVat = Σ2640–2649`, `netVat = outputVat - inputVat`) and `profitAndLoss` (accounts 3000–8999; `groupBy "class" | "account"`; class names for 3–8 as a 6-entry constant; `result = -Σ`); verify: 3.1–3.5 pass
+- [x] 3.7 `src/index.ts`: register `bokio_vat_summary` (`{ companyId, from, to }` → `{ from, to, accounts: [{account, name, amount}], outputVat, inputVat, netVat }`; description says "account totals only, no return boxes") and `bokio_profit_and_loss` (`{ companyId, from, to, groupBy = "class" }` → `{ from, to, rows: [{key, name, amount}], result }`); count → 59 in test and AGENTS files; CHANGELOG + README; verify: `pnpm test`
 
 ## 4. Open items
 - [ ] 4.1 Failing test `test/sie.test.ts::payment settles the earliest posting` proves scenario "Payment settles the earliest open item of equal amount"

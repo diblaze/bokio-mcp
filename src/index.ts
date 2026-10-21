@@ -18,7 +18,17 @@ import {
     tokenWarning,
     writesAllowed,
 } from "./bokio.js";
-import { allLines, balancesAt, duplicates, ledger, parseSie, reconcile, type Sie } from "./sie.js";
+import {
+    allLines,
+    balancesAt,
+    duplicates,
+    ledger,
+    parseSie,
+    profitAndLoss,
+    reconcile,
+    type Sie,
+    vatSummary,
+} from "./sie.js";
 
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
@@ -518,6 +528,42 @@ tool(
         bankTotal: z.number(),
         ledgerTotal: z.number(),
         difference: z.number(),
+    },
+);
+
+tool(
+    "bokio_vat_summary",
+    `VAT (2610-2659) and sales (3000-3999) account totals for a period, plus outputVat (negated 2610-2639), inputVat (2640-2649) and netVat = output - input (positive = to pay). Account totals only: does not map to tax-return boxes. ${SIGN}`,
+    { companyId, from: isoDay, to: isoDay },
+    async (a) => {
+        if (a.from > a.to) throw new Error("from is after to");
+        return okStructured(vatSummary(await loadYears(a.companyId, a), a.from, a.to));
+    },
+    {
+        from: z.string(),
+        to: z.string(),
+        accounts: z.array(z.object({ account: z.number(), name: z.string(), amount: z.number() })),
+        outputVat: z.number(),
+        inputVat: z.number(),
+        netVat: z.number(),
+    },
+);
+
+tool(
+    "bokio_profit_and_loss",
+    `Result accounts (classes 3-8) for a period, grouped by BAS class or by account; result = negated total (profit positive). ${SIGN}`,
+    { companyId, from: isoDay, to: isoDay, groupBy: z.enum(["class", "account"]).default("class") },
+    async (a) => {
+        if (a.from > a.to) throw new Error("from is after to");
+        return okStructured(
+            profitAndLoss(await loadYears(a.companyId, a), a.from, a.to, a.groupBy),
+        );
+    },
+    {
+        from: z.string(),
+        to: z.string(),
+        rows: z.array(z.object({ key: z.string(), name: z.string(), amount: z.number() })),
+        result: z.number(),
     },
 );
 

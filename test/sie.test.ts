@@ -5,8 +5,10 @@ import {
     duplicates,
     ledger,
     parseSie,
+    profitAndLoss,
     reconcile,
     toOre,
+    vatSummary,
 } from "../src/sie.js";
 
 // Synthetic export mirroring Bokio's layout: CRLF, PC8, several #RAR years,
@@ -386,5 +388,103 @@ describe("bank reconciliation", () => {
         const r = reconcile(book(body), [row("2026-03-10", -25)], 3);
         expect(r.matched.map((m) => m.ledger.number)).toEqual(["1"]);
         expect(r.unmatchedLedger).toEqual([]);
+    });
+});
+
+describe("VAT summary and profit and loss", () => {
+    const books = () =>
+        parseSie(
+            sie([
+                ...ver("V", 1, "20260115", "Sale", [
+                    [1510, "1250.00"],
+                    [3011, "-1000.00"],
+                    [2610, "-250.00"],
+                ]),
+                ...ver("V", 2, "20260120", "Purchase", [
+                    [2440, "-125.00"],
+                    [2640, "25.00"],
+                    [5410, "100.00"],
+                ]),
+                ...ver("V", 3, "20260125", "Salary", [
+                    [7210, "300.00"],
+                    [1930, "-300.00"],
+                ]),
+                ...ver("V", 4, "20260420", "Next quarter", [
+                    [1510, "125.00"],
+                    [3011, "-100.00"],
+                    [2610, "-25.00"],
+                ]),
+            ]),
+        );
+
+    it("vat summary per account (VAT and sales accounts are summed per account for the period)", () => {
+        const v = vatSummary([books()], "2026-01-01", "2026-03-31");
+        expect(v.accounts.map((a) => [a.account, a.amount])).toEqual([
+            [2610, -250],
+            [2640, 25],
+            [3011, -1000],
+        ]);
+    });
+
+    it("vat settlement left out (VAT settlement verification is left out)", () => {
+        const s = parseSie(
+            sie([
+                ...ver("V", 1, "20260115", "Sale", [
+                    [3011, "-1000.00"],
+                    [2610, "-250.00"],
+                ]),
+                ...ver("V", 2, "20260331", "Momsredovisning: Q1", [
+                    [2610, "250.00"],
+                    [2650, "-250.00"],
+                ]),
+            ]),
+        );
+        const v = vatSummary([s], "2026-01-01", "2026-03-31");
+        expect([v.outputVat, v.netVat]).toEqual([250, 250]);
+    });
+
+    it("vat totals from ranges (Totals derive from account ranges)", () => {
+        const v = vatSummary([books()], "2026-01-01", "2026-03-31");
+        expect([v.outputVat, v.inputVat, v.netVat]).toEqual([250, 25, 225]);
+    });
+
+    it("p&l by class (Result per class covers classes 3 to 8)", () => {
+        const p = profitAndLoss([books()], "2026-01-01", "2026-03-31", "class");
+        expect(p.rows.map((r) => [r.key, r.amount])).toEqual([
+            ["3", -1000],
+            ["5", 100],
+            ["7", 300],
+        ]);
+        expect(p.result).toBe(600);
+    });
+
+    it("p&l by account (Grouping by account lists each account once)", () => {
+        const p = profitAndLoss([books()], "2026-01-01", "2026-12-31", "account");
+        expect(p.rows.map((r) => [r.key, r.amount])).toEqual([
+            ["3011", -1100],
+            ["5410", 100],
+            ["7210", 300],
+        ]);
+    });
+
+    it("p&l leaves out year-end closing (Year-end closing verification is left out)", () => {
+        const s = parseSie(
+            sie([
+                ...ver("V", 1, "20260615", "Sale", [
+                    [1930, "1000.00"],
+                    [3011, "-1000.00"],
+                ]),
+                ...ver("V", 2, "20261231", "Arets resultat", [
+                    [8999, "1000.00"],
+                    [2099, "-1000.00"],
+                ]),
+            ]),
+        );
+        expect(profitAndLoss([s], "2026-01-01", "2026-12-31", "class").result).toBe(1000);
+    });
+
+    it("p&l ignores balance accounts (Balance accounts are excluded)", () => {
+        const p = profitAndLoss([books()], "2026-01-01", "2026-12-31", "account");
+        expect(p.rows.every((r) => Number(r.key) >= 3000)).toBe(true);
     });
 });
