@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/diblaze/bokio-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/diblaze/bokio-mcp/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/bokio-mcp)](https://www.npmjs.com/package/bokio-mcp)
+[![downloads](https://img.shields.io/npm/dm/bokio-mcp)](https://www.npmjs.com/package/bokio-mcp)
 
 An MCP server for the [Bokio](https://www.bokio.se/) accounting API. Connect it to Claude or any other MCP client and you can ask about your books in plain language: what is on the bank account at a given date, which customer invoices are still unpaid, what the VAT for last quarter adds up to, whether anything has been booked twice.
 
