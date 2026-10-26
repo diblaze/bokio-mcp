@@ -30,11 +30,11 @@
   - Verify: `rg -n "mcp-tdqs|tdqs lint" AGENTS.md test/AGENTS.md CONTRIBUTING.md` prints lines.
 
 ## 2. Short, plain tool descriptions
-- [ ] 2.1 Write a failing test `test/server.test.ts::tool definitions › descriptions are short and plain (Descriptions stay short and plain)`, which proves scenario "Descriptions stay short and plain".
+- [x] 2.1 Write a failing test `test/server.test.ts::tool definitions › descriptions are short and plain (Descriptions stay short and plain)`, which proves scenario "Descriptions stay short and plain".
   - For every listed tool, `description.replace("WRITE.", "")` has ≤ 3 matches of `/[.!?](\s|$)/g`.
   - No description matches `/\b(IMPORTANT|MUST|NEVER|ALWAYS|NOTE)\b/`.
   - `readOnlyHint === false` implies `description` includes `WRITE.` (E8).
-- [ ] 2.2 In `src/index.ts`, rewrite every `tool()` description inline (E6, E7, E24). Each one is 1–3 plain sentences:
+- [x] 2.2 In `src/index.ts`, rewrite every `tool()` description inline (E6, E7, E24). Each one is 1–3 plain sentences:
   - (a) verb + resource + scope, telling it apart from siblings.
   - (b) when to use a sibling instead, for example list vs get vs computed tools, `bokio_download_sie` (raw file) vs computed tools (figures), and `bokio_list_journal_entries` vs `bokio_account_ledger`.
   - (c) the return value in a phrase when there is no output schema. Downloads return "Wrote N bytes to <path>"; the SIE preview returns the first 4,000 characters.
@@ -43,7 +43,7 @@
   - Move single-parameter facts into that parameter's `.describe()`, such as reconcile's two-decimal and outflow-negative rules into `rows`.
   - Keep `WRITE.` and `SIGN` (E24).
   - Verify: 2.1 and group 1 tests pass, and `test/readonly.test.ts` passes.
-- [ ] 2.3 In `AGENTS.md` › "Adding or changing a tool" (`:60`), add a bullet: descriptions are 1–3 plain sentences inline, the first sentence says what the tool does, no shouting words, and shared parameter facts live in the zod fragment `.describe()`. README stays a list of names (E22). Verify: `rg -n "1–3 plain sentences" AGENTS.md`.
+- [x] 2.3 In `AGENTS.md` › "Adding or changing a tool" (`:60`), add a bullet: descriptions are 1–3 plain sentences inline, the first sentence says what the tool does, no shouting words, and shared parameter facts live in the zod fragment `.describe()`. README stays a list of names (E22). Verify: `rg -n "1–3 plain sentences" AGENTS.md`.
 
 ## 3. Check
-- [ ] 3.1 `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check && pnpm exec tdqs lint --command "env BOKIO_ALLOW_WRITES=1 node dist/index.js"`
+- [x] 3.1 `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check && pnpm exec tdqs lint --command "env BOKIO_ALLOW_WRITES=1 node dist/index.js"`

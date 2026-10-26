@@ -1,6 +1,6 @@
 # Proposal
 
-Status: approved
+Status: done
 Issue: diblaze/bokio-mcp#19
 
 ## Why
