@@ -2,6 +2,14 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/). Entries from 0.4.0 on are generated from commit messages by release-please.
 
+## [0.5.0](https://github.com/diblaze/bokio-mcp/compare/v0.4.0...v0.5.0) (2026-10-26)
+
+
+### Added
+
+* **tools:** describe every tool parameter ([f00d130](https://github.com/diblaze/bokio-mcp/commit/f00d1301b1b71e7317c2f6bd3ac83e4675dcc8d5))
+* **tools:** rewrite tool descriptions for agents ([c00e008](https://github.com/diblaze/bokio-mcp/commit/c00e008b2094c3a5c8b53661025084e0c95a6644))
+
 ## [0.4.0](https://github.com/diblaze/bokio-mcp/compare/v0.3.0...v0.4.0) (2026-10-21)
 
 
