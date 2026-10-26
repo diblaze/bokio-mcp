@@ -14,7 +14,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `src/sie.ts` | SIE 4 export parser (PC8/CP437, `#RAR 0`, annulment pairs) and the pure öre computations behind the computed tools. |
 | `src/bokio.ts` | HTTP client + config: `bokioRequest` (JSON, enforces the write gate), `bokioDownload` (binary GET), `fileForm`, `filterQuery`, `resolveCompanyId`, `writesAllowed`, `downloadTarget`. |
 | `test/bokio.test.ts` | Unit tests (mocked `fetch`) for the client, write gate, filterQuery, downloadTarget. |
-| `test/server.test.ts` | In-memory `Client↔Server` test: asserts all tools register with explicit annotations; computed tools against a mocked fiscal-year listing + SIE download. |
+| `test/server.test.ts` | In-memory `Client↔Server` test: asserts all tools register with explicit annotations; computed tools against a mocked fiscal-year listing + SIE download; TDQS lint (`mcp-tdqs`) over all tools. |
 | `test/sie.test.ts` | Parser and computation tests on synthetic SIE built in the file. |
 | `scripts/smoke.mjs` | Spawns built `dist/index.js` directly and through a symlink (as npm installs bins), runs the MCP handshake + `tools/list`, asserts read-only surface (writes hidden, all annotated). Run via `pnpm run smoke`. |
 | `scripts/pack-check.mjs` | `npm pack --dry-run`: tarball holds only `dist/`, README, LICENSE, `package.json`. Run via `pnpm run pack:check` (CI). |
@@ -92,7 +92,7 @@ When adding a tool, the `test/server.test.ts` count assertion (`expect(tools.len
 ### External
 - `@modelcontextprotocol/sdk` (^1.29) — MCP server/client, stdio + in-memory transports.
 - `zod` (^4) — tool input schemas.
-- dev: `@biomejs/biome` (2.5), `typescript` (5.x), `vitest` (2.x), `tsx`.
+- dev: `@biomejs/biome` (2.5), `typescript` (5.x), `vitest` (2.x), `tsx`, `mcp-tdqs` (pinned; TDQS lint in `test/server.test.ts`).
 
 ### Runtime
 - Bokio REST API `https://api.bokio.se/v1` (OpenAPI: <https://github.com/bokio/bokio-api>).
