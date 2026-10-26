@@ -25,7 +25,9 @@ To try a local build in an MCP client, point it at `node /path/to/bokio-mcp/dist
 2. Make sure `pnpm exec biome ci`, `pnpm run typecheck`, `pnpm test`, `pnpm run build` and `pnpm run smoke` pass (CI runs the same on Node 22 and 24).
 3. Open a PR against `main`. CI must be green and a maintainer (per `CODEOWNERS`) must approve.
 
-Adding a tool: follow the existing `tool()` pattern in `src/index.ts`, put `WRITE.` in the description of anything that changes data, and update the tool count in `test/server.test.ts` plus the `required`/`forbidden` lists in `scripts/smoke.mjs`.
+Adding a tool: follow the existing `tool()` pattern in `src/index.ts`, put `WRITE.` in the description of anything that changes data, and update the tool count in `test/server.test.ts` plus the `required`/`forbidden` lists in `scripts/smoke.mjs`. Describe every parameter; shared facts go in the zod fragment (`companyId`, the resource ids, `savePath`), not in each tool.
+
+Tool definition quality: `pnpm test` runs the [TDQS](https://github.com/glama-ai/tool-definition-quality-score) lint over all tools. To see the full lint report for the built server, run `pnpm run build`, then `pnpm exec tdqs lint --command "env BOKIO_ALLOW_WRITES=1 node dist/index.js" --format markdown`; the `env` is needed because tdqs does not pass your environment to the server. `tdqs score` grades the descriptions with a model, the way Glama does; it needs `TDQS_BASE_URL`, `TDQS_API_KEY` and `TDQS_MODEL`, costs money and varies between runs, so it is a manual check only.
 
 Never put real accounting data, company ids, org numbers or tokens in code, tests or issues.
 

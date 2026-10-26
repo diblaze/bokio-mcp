@@ -12,7 +12,7 @@ Vitest suites. Two complementary layers: pure unit tests of the HTTP client/conf
 | File | Description |
 |------|-------------|
 | `bokio.test.ts` | Unit tests for `bokioRequest` (Bearer header, query building, non-2xx throw, **write gate on/off**, missing-token error), `resolveCompanyId`, `writesAllowed`, `filterQuery`, `downloadTarget` (traversal rejection). Mocks `fetch` via `vi.stubGlobal`. |
-| `server.test.ts` | Sets `BOKIO_ALLOW_WRITES=1` **before** importing `../src/index.js`, connects a `Client` to the exported `server` over `InMemoryTransport.createLinkedPair()`, and asserts: all 60 tools present, every tool has a boolean `readOnlyHint`, and read/write/destructive/idempotent hints are correct. |
+| `server.test.ts` | Sets `BOKIO_ALLOW_WRITES=1` **before** importing `../src/index.js`, connects a `Client` to the exported `server` over `InMemoryTransport.createLinkedPair()`, and asserts: all 60 tools present, every tool has a boolean `readOnlyHint`, and read/write/destructive/idempotent hints are correct. `tool definitions` runs the TDQS lint (`mcp-tdqs`) over all tools and checks id/savePath descriptions. |
 | `sie.test.ts` | Parser and computation tests on a synthetic SIE built in the file (CRLF, PC8, two `#RAR` years, annulment pairs). Invented data only. |
 
 ## For AI Agents

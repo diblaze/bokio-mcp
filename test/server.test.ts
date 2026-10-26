@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { lintServer, parseToolDefinitions } from "mcp-tdqs";
 import { describe, expect, it, vi } from "vitest";
 
 // Writes must be enabled BEFORE importing the server module, since tool
@@ -609,5 +610,61 @@ describe("computed tools", () => {
         expect(oi.structuredContent).toMatchObject({ openingUnitemised: 0, balance: 70 });
         vi.unstubAllGlobals();
         await client.close();
+    });
+});
+
+describe("tool definitions", () => {
+    async function listed() {
+        const client = await connect();
+        const { tools } = await client.listTools();
+        await client.close();
+        return tools;
+    }
+    type Props = Record<string, { description?: string }>;
+    const props = (t: { inputSchema: { properties?: unknown } }) =>
+        (t.inputSchema.properties ?? {}) as Props;
+
+    it("lint is clean (Lint reports nothing but shadow candidates)", async () => {
+        const report = lintServer({
+            serverName: "bokio-mcp",
+            tools: parseToolDefinitions(await listed()).tools,
+        });
+        for (const t of report.tools)
+            expect(t.contextSignals.schemaDescriptionCoverage, t.name).toBe(100);
+        const blocking = report.findings.filter(
+            (f) =>
+                f.severity === "error" ||
+                (f.severity === "warning" && f.rule !== "shadow-candidate"),
+        );
+        expect(blocking).toEqual([]);
+    });
+
+    it("id params name their source (Id parameters name the tool that lists them)", async () => {
+        const tools = await listed();
+        const names = new Set(tools.map((t) => t.name));
+        for (const t of tools) {
+            for (const [key, p] of Object.entries(props(t))) {
+                if (key === "companyId") {
+                    expect(p.description, t.name).toContain("BOKIO_COMPANY_ID");
+                    continue;
+                }
+                if (!key.endsWith("Id")) continue;
+                const named = (p.description ?? "").match(/bokio_\w+/g) ?? [];
+                expect(
+                    named.some((n) => names.has(n)),
+                    `${t.name}.${key}`,
+                ).toBe(true);
+            }
+        }
+    });
+
+    it("savePath says where files land (Save path states where files land)", async () => {
+        const withSave = (await listed()).filter((t) => "savePath" in props(t));
+        expect(withSave.length).toBe(4);
+        for (const t of withSave) {
+            const d = props(t).savePath.description ?? "";
+            expect(d, t.name).toContain("BOKIO_DOWNLOAD_DIR");
+            expect(d, t.name).toMatch(/overwrit/);
+        }
     });
 });
