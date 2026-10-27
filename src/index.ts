@@ -21,6 +21,7 @@ import {
 import {
     allLines,
     balancesAt,
+    decodeSie,
     duplicates,
     ledger,
     openItems,
@@ -377,7 +378,7 @@ tool(
         const path = `${cbase(a.companyId)}/sie/${a.fiscalYearId}/download`;
         if (a.savePath) return saveDownload(path, a.savePath);
         const buf = await bokioDownload(path);
-        return ok(buf.toString("latin1").slice(0, 4000));
+        return ok(decodeSie(buf).slice(0, 4000));
     },
 );
 
