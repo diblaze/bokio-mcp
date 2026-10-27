@@ -1326,7 +1326,16 @@ tool(
     "bokio_raw_get",
     "Send a GET to any Bokio API path that no other tool covers; {companyId} in the path is replaced with the company id. Returns the response body.",
     {
-        path: z.string().describe("e.g. /companies/{companyId}/tag-groups"),
+        path: z
+            .string()
+            .min(1)
+            .regex(
+                /^[\w\-/{}]*(?:\.[\w\-/{}]+)*\.?$/,
+                "path must be an API path such as /companies/{companyId}/tag-groups (letters, digits, / - _ . { }, no ..); put query values in params",
+            )
+            .describe(
+                "API path below /v1, e.g. /companies/{companyId}/tag-groups; query values go in params",
+            ),
         companyId,
         params: z
             .record(z.string(), z.union([z.string(), z.number()]))

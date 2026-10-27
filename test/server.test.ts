@@ -408,6 +408,60 @@ describe("path ids", () => {
     });
 });
 
+describe("raw get path", () => {
+    async function rawGet(args: Record<string, unknown>) {
+        const client = await connect();
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        const f = vi.fn(
+            async () => new Response("{}", { headers: { "content-type": "application/json" } }),
+        );
+        vi.stubGlobal("fetch", f);
+        try {
+            const res = await client.callTool({ name: "bokio_raw_get", arguments: args });
+            return { res, f };
+        } finally {
+            vi.unstubAllGlobals();
+            await client.close();
+        }
+    }
+
+    it("escaping paths are rejected before any request (Raw path leaving the API is rejected)", async () => {
+        for (const path of [
+            "/../x",
+            "/companies/{companyId}/../../x",
+            "/%2e%2e/x",
+            "/..\\x",
+            "/a\\b",
+        ]) {
+            const { res, f } = await rawGet({ path });
+            expect(res.isError, path).toBe(true);
+            expect(f, path).not.toHaveBeenCalled();
+        }
+    });
+
+    it("query in path is rejected (Raw path carrying a query is rejected)", async () => {
+        for (const path of ["/a?b=1", "/a#f"]) {
+            const { res, f } = await rawGet({ path });
+            expect(res.isError, path).toBe(true);
+            expect(JSON.stringify(res.content), path).toMatch(/params/);
+            expect(f, path).not.toHaveBeenCalled();
+        }
+    });
+
+    it("placeholder path resolves (Raw path with the company placeholder resolves)", async () => {
+        const { res, f } = await rawGet({
+            path: "/companies/{companyId}/tag-groups",
+            params: { page: 2 },
+        });
+        expect(res.isError).toBeFalsy();
+        expect(f).toHaveBeenCalledTimes(1);
+        expect(String((f.mock.calls[0] as unknown[])[0])).toMatch(
+            /\/companies\/co\/tag-groups\?page=2$/,
+        );
+    });
+});
+
 // ---- computed tools: mocked Bokio with fiscal-year listing + SIE downloads --
 
 const YEARS = [
