@@ -42,6 +42,29 @@ export function writesAllowed(): boolean {
     return v === "1" || v === "true" || v === "yes" || v === "on";
 }
 
+const CACHE_TTL_MS = 5 * 60_000;
+const cache = new Map<string, { at: number; value: Promise<unknown> }>();
+
+/**
+ * Share one load per key for CACHE_TTL_MS, including while it is in flight.
+ * A rejected load is dropped; clearCache also drops loads in flight.
+ */
+export function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+    const hit = cache.get(key);
+    const age = hit ? Date.now() - hit.at : -1;
+    if (hit && age >= 0 && age < CACHE_TTL_MS) return hit.value as Promise<T>;
+    const value = load();
+    cache.set(key, { at: Date.now(), value });
+    value.catch(() => {
+        if (cache.get(key)?.value === value) cache.delete(key);
+    });
+    return value;
+}
+
+export function clearCache(): void {
+    cache.clear();
+}
+
 /** Ids are spliced into URL paths, so only plain id characters are allowed (no `/`, `?`, `..`). */
 export const ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
@@ -134,11 +157,14 @@ export async function bokioRequest<T = unknown>(opts: RequestOpts): Promise<T> {
         bodyInit = JSON.stringify(opts.body);
     }
 
+    // A write may land even when it fails or times out, so any write drops cached reads.
     const res = await fetch(buildUrl(opts.path, opts.query), {
         method,
         headers,
         body: bodyInit,
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }).finally(() => {
+        if (WRITE_METHODS.has(method)) clearCache();
     });
     const text = await res.text();
     if (!res.ok) {

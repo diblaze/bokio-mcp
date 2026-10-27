@@ -2,6 +2,8 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     bokioRequest,
+    cached,
+    clearCache,
     downloadTarget,
     filterQuery,
     resolveCompanyId,
@@ -193,5 +195,87 @@ describe("bokioRequest", () => {
         delete process.env.BOKIO_TOKEN;
         vi.stubGlobal("fetch", mockFetch(200, {}));
         await expect(bokioRequest({ path: "/x" })).rejects.toThrow(/BOKIO_TOKEN not set/);
+    });
+});
+
+describe("cache", () => {
+    const saved = { ...process.env };
+    beforeEach(() => {
+        clearCache();
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_ALLOW_WRITES = "1";
+    });
+    afterEach(() => {
+        process.env = { ...saved };
+        vi.unstubAllGlobals();
+    });
+    const json = (status: number) =>
+        vi.fn(
+            async () =>
+                new Response("{}", { status, headers: { "content-type": "application/json" } }),
+        );
+
+    it("cached reloads after a rejected load (Failed load is not cached)", async () => {
+        const load = vi
+            .fn<() => Promise<string>>()
+            .mockRejectedValueOnce(new Error("boom"))
+            .mockResolvedValueOnce("ok");
+        await expect(cached("k", load)).rejects.toThrow("boom");
+        await expect(cached("k", load)).resolves.toBe("ok");
+        expect(load).toHaveBeenCalledTimes(2);
+    });
+
+    it("successful write clears the cache (Successful write clears cached data)", async () => {
+        const load = vi.fn(async () => "v");
+        await cached("k", load);
+        vi.stubGlobal("fetch", json(200));
+        await bokioRequest({ path: "/x" });
+        await cached("k", load);
+        expect(load).toHaveBeenCalledTimes(1);
+        await bokioRequest({ method: "POST", path: "/x" });
+        await cached("k", load);
+        expect(load).toHaveBeenCalledTimes(2);
+    });
+
+    it("blocked write leaves the cache (Blocked write leaves cached data)", async () => {
+        const load = vi.fn(async () => "v");
+        await cached("k", load);
+        delete process.env.BOKIO_ALLOW_WRITES;
+        const f = json(200);
+        vi.stubGlobal("fetch", f);
+        await expect(bokioRequest({ method: "POST", path: "/x" })).rejects.toThrow(/blocked/);
+        await cached("k", load);
+        expect(load).toHaveBeenCalledTimes(1);
+        expect(f).not.toHaveBeenCalled();
+    });
+
+    it("load in flight across a write is not stored (Read in flight across a write is not reused)", async () => {
+        let release: (v: string) => void = () => {};
+        const slow = cached("k", () => new Promise<string>((r) => (release = r)));
+        vi.stubGlobal("fetch", json(200));
+        await bokioRequest({ method: "POST", path: "/x" });
+        release("old");
+        await expect(slow).resolves.toBe("old");
+        const load = vi.fn(async () => "new");
+        await expect(cached("k", load)).resolves.toBe("new");
+        expect(load).toHaveBeenCalledTimes(1);
+    });
+
+    it("parallel loads share one call (Parallel loads share one request)", async () => {
+        let release: (v: string) => void = () => {};
+        const load = vi.fn(() => new Promise<string>((r) => (release = r)));
+        const both = Promise.all([cached("k", load), cached("k", load)]);
+        release("v");
+        await expect(both).resolves.toEqual(["v", "v"]);
+        expect(load).toHaveBeenCalledTimes(1);
+    });
+
+    it("failed write clears the cache (Failed write also clears cached data)", async () => {
+        const load = vi.fn(async () => "v");
+        await cached("k", load);
+        vi.stubGlobal("fetch", json(500));
+        await expect(bokioRequest({ method: "POST", path: "/x" })).rejects.toThrow(/500/);
+        await cached("k", load);
+        expect(load).toHaveBeenCalledTimes(2);
     });
 });
