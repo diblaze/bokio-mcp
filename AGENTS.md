@@ -12,7 +12,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 |------|-------------|
 | `src/index.ts` | Server entry: builds the `McpServer` with the `INSTRUCTIONS` sent at initialize (keep them short and true to the tools), registers all 60 tools via the `tool()` helper, gates `main()` on being the entry point. Exports `server` for tests. |
 | `src/sie.ts` | SIE 4 export parser (PC8/CP437, `#RAR 0`, annulment pairs) and the pure öre computations behind the computed tools. |
-| `src/bokio.ts` | HTTP client + config: `bokioRequest` (JSON, enforces the write gate), `bokioDownload` (binary GET), `fileForm`, `filterQuery`, `resolveCompanyId`, `writesAllowed`, `downloadTarget`. |
+| `src/bokio.ts` | HTTP client + config: `bokioRequest` (JSON, enforces the write gate), `bokioDownload` (binary GET), `fileForm`, `filterQuery`, `resolveCompanyId`, `writesAllowed`, `downloadTarget`, `cached`/`clearCache` (5-minute read cache, cleared by any write). |
 | `test/bokio.test.ts` | Unit tests (mocked `fetch`) for the client, write gate, filterQuery, downloadTarget. |
 | `test/server.test.ts` | In-memory `Client↔Server` test: asserts all tools register with explicit annotations; computed tools against a mocked fiscal-year listing + SIE download; TDQS lint (`mcp-tdqs`) over all tools. |
 | `test/sie.test.ts` | Parser and computation tests on synthetic SIE built in the file. |
@@ -86,7 +86,7 @@ When adding a tool, the `test/server.test.ts` count assertion (`expect(tools.len
 - `tool()` wraps every handler in try/catch and returns `{ isError: true }` — handlers throw freely.
 - `ok(data)` formats a text result; `okStructured(data)` adds `structuredContent` (required when the tool declares an output shape); `cbase(companyId)` builds `/companies/{id}` with `resolveCompanyId` fallback to `BOKIO_COMPANY_ID`.
 - Shared zod fragments (`companyId`, `idParam`, `page`, `pageSize`, `query`, `isoDay`) are defined once and reused.
-- Computed tools: `loadYears(companyId, {fiscalYearId?, from, to})` lists fiscal years once (skipped when an id is given), downloads each overlapping SIE export and parses it with `parseSie`; the arithmetic lives in `src/sie.ts`.
+- Computed tools: `loadYears(companyId, {fiscalYearId?, from, to})` lists fiscal years once (skipped when an id is given), downloads each overlapping SIE export and parses it with `parseSie`, reusing both through `cached()` for 5 minutes (any write through `bokioRequest` calls `clearCache()`); the arithmetic lives in `src/sie.ts`.
 
 ## Dependencies
 

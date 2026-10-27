@@ -12,7 +12,7 @@ The server implementation: a thin, convention-driven MCP wrapper over the Bokio 
 | File | Description |
 |------|-------------|
 | `index.ts` | Creates and **exports** `server` (`McpServer`). Defines the `tool()` helper that registers each tool with derived annotations + read-only gating. Registers all 60 tools. `main()` opens stdio only when run as the entry point (`isEntryPoint()`: `realpathSync(process.argv[1])` equals this file, so the npm bin symlink works; a non-file argv[1] counts as imported), so importing for tests does not connect. |
-| `bokio.ts` | `bokioRequest<T>` (JSON; enforces the write gate at the single choke point), `bokioDownload` (binary GET), `fileForm` (multipart upload), `filterQuery` (journal date-filter join, unit-tested), `downloadTarget` (confines to `BOKIO_DOWNLOAD_DIR` or the working directory), `resolveCompanyId`, `writesAllowed`, `baseUrl`. 30s `AbortSignal.timeout` on every request. |
+| `bokio.ts` | `bokioRequest<T>` (JSON; enforces the write gate at the single choke point), `bokioDownload` (binary GET), `fileForm` (multipart upload), `filterQuery` (journal date-filter join, unit-tested), `downloadTarget` (confines to `BOKIO_DOWNLOAD_DIR` or the working directory), `resolveCompanyId`, `writesAllowed`, `baseUrl`, `cached`/`clearCache` (in-process 5-minute cache for `loadYears`; `bokioRequest` clears it after every write, success or failure). 30s `AbortSignal.timeout` on every request. |
 | `sie.ts` | `parseSie` (PC8/CP437 table, `#RAR 0`/`#IB 0`/`#UB 0` only, lines dated by their `#VER`, `markAnnulments`) and pure computations returning kronor from öre sums. No I/O; `index.ts` downloads via `loadYears`. |
 
 ## For AI Agents
