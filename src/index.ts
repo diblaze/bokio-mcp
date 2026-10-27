@@ -9,6 +9,7 @@ import { type ZodRawShape, z } from "zod";
 import {
     bokioDownload,
     bokioRequest,
+    cached,
     downloadTarget,
     fileForm,
     filterQuery,
@@ -40,7 +41,7 @@ Writes: tools that change data exist only when the server runs with BOKIO_ALLOW_
 
 Numbers: for balances, ledgers, VAT, profit and loss, open items, double bookings and bank reconciliation use the computed tools that read the SIE export instead of summing journal entries yourself; they compute in whole öre. Amounts are in ledger sign, debit positive, credit negative, so liabilities, equity and revenue show negative. A verification and its "Annullering av ..." reversal cancel out.
 
-Cost: each computed call lists the fiscal years, then downloads one SIE export per fiscal year it touches. Bokio allows 5,000 requests per company per month and 200 per minute, so ask for the date range you need and reuse results.
+Cost: each computed call lists the fiscal years, then downloads one SIE export per fiscal year it touches. Both are reused for 5 minutes; writes made through this server clear them, while changes made in Bokio itself can take up to 5 minutes to show. Bokio allows 5,000 requests per company per month and 200 per minute, so ask for the date range you need and reuse results.
 
 Gaps: revenue booked as journal entries does not appear in bokio_list_invoices; use bokio_account_ledger or bokio_open_items. bokio_raw_get reads any other Bokio path.`;
 
@@ -397,9 +398,10 @@ async function loadYears(
     if (sel.fiscalYearId) {
         ids = [sel.fiscalYearId];
     } else {
-        const res = await bokioRequest<{ items?: FiscalYear[] } | FiscalYear[]>({
-            path: `${base}/fiscal-years`,
-        });
+        const path = `${base}/fiscal-years`;
+        const res = await cached(path, () =>
+            bokioRequest<{ items?: FiscalYear[] } | FiscalYear[]>({ path }),
+        );
         const years = (Array.isArray(res) ? res : (res?.items ?? [])).map((y) => ({
             id: y.id,
             from: y.startDate.slice(0, 10),
@@ -416,7 +418,10 @@ async function loadYears(
         }
     }
     const sies: Sie[] = [];
-    for (const id of ids) sies.push(parseSie(await bokioDownload(`${base}/sie/${id}/download`)));
+    for (const id of ids) {
+        const path = `${base}/sie/${id}/download`;
+        sies.push(await cached(path, async () => parseSie(await bokioDownload(path))));
+    }
     return sies.sort((a, b) => a.from.localeCompare(b.from));
 }
 

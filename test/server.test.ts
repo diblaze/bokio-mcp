@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { lintServer, parseToolDefinitions } from "mcp-tdqs";
 import { describe, expect, it, vi } from "vitest";
+import { clearCache } from "../src/bokio.js";
 
 // Writes must be enabled BEFORE importing the server module, since tool
 // registration reads BOKIO_ALLOW_WRITES at import time (#3).
@@ -487,6 +488,7 @@ function sieFor(id: string): string {
 }
 
 function mockBokio() {
+    clearCache();
     process.env.BOKIO_TOKEN = "a".repeat(40);
     process.env.BOKIO_COMPANY_ID = "co";
     const f = vi.fn(async (url: URL | string) => {
@@ -784,5 +786,89 @@ describe("SIE preview", () => {
             Buffer.from('#KONTO 1930 "Företagskonto Väst ås"\r\n', "latin1"),
         );
         expect(text).toContain("Företagskonto Väst ås");
+    });
+});
+
+describe("computed cache", () => {
+    it("instructions state the reuse window (Instructions state the five-minute reuse)", async () => {
+        const client = await connect();
+        const i = client.getInstructions() ?? "";
+        await client.close();
+        expect(i).toContain("5 minutes");
+        expect(i).toContain("Bokio itself");
+    });
+
+    const balances = (companyId?: string) => ({
+        name: "bokio_account_balances",
+        arguments: { date: "2026-06-30", accounts: [1930], ...(companyId ? { companyId } : {}) },
+    });
+
+    it("second computed call reuses listing and export (Second computed call within five minutes makes no request)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        await client.callTool(balances());
+        const res = await client.callTool({
+            name: "bokio_vat_summary",
+            arguments: { from: "2026-01-01", to: "2026-03-31" },
+        });
+        expect(res.isError).toBeFalsy();
+        expect(f.mock.calls.length).toBe(2);
+        // Same figures as an uncached run over the same mocked export.
+        clearCache();
+        const fresh = await client.callTool({
+            name: "bokio_vat_summary",
+            arguments: { from: "2026-01-01", to: "2026-03-31" },
+        });
+        expect(res.structuredContent).toEqual(fresh.structuredContent);
+        vi.unstubAllGlobals();
+        await client.close();
+    });
+
+    it("parallel computed calls share one download (Parallel computed calls share one download)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        try {
+            const [a, b] = await Promise.all([
+                client.callTool(balances()),
+                client.callTool({
+                    name: "bokio_vat_summary",
+                    arguments: { from: "2026-01-01", to: "2026-03-31" },
+                }),
+            ]);
+            expect(a.isError).toBeFalsy();
+            expect(b.isError).toBeFalsy();
+            expect(f.mock.calls.length).toBe(2);
+        } finally {
+            vi.unstubAllGlobals();
+            await client.close();
+        }
+    });
+
+    it("cache expires after five minutes (Cached copy expires after five minutes)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+            await client.callTool(balances());
+            vi.setSystemTime(Date.now() + 5 * 60_000 + 1);
+            await client.callTool(balances());
+            expect(f.mock.calls.length).toBe(4);
+        } finally {
+            vi.useRealTimers();
+            vi.unstubAllGlobals();
+            await client.close();
+        }
+    });
+
+    it("cache is keyed by company (Cache is per company)", async () => {
+        const client = await connect();
+        const f = mockBokio();
+        await client.callTool(balances());
+        await client.callTool(balances("co2"));
+        expect(f.mock.calls.length).toBe(4);
+        expect(String(f.mock.calls[2][0])).toContain("/companies/co2/");
+        expect(String(f.mock.calls[3][0])).toContain("/companies/co2/");
+        vi.unstubAllGlobals();
+        await client.close();
     });
 });
