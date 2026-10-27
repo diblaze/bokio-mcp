@@ -678,3 +678,57 @@ describe("tool definitions", () => {
         }
     });
 });
+
+describe("SIE preview", () => {
+    async function preview(buf: Buffer): Promise<string> {
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response(buf)),
+        );
+        const client = await connect();
+        try {
+            const res = await client.callTool({
+                name: "bokio_download_sie",
+                arguments: { fiscalYearId: "fy1" },
+            });
+            return (res.content as { text: string }[])[0].text;
+        } finally {
+            vi.unstubAllGlobals();
+            await client.close();
+        }
+    }
+
+    it("keeps Swedish letters (PC8 preview keeps Swedish letters)", async () => {
+        // Invented account name "Företagskonto Väst ås" with ö/ä/å as CP437 bytes.
+        const text = await preview(
+            Buffer.concat([
+                Buffer.from('#FORMAT PC8\r\n#RAR 0 20260101 20261231\r\n#KONTO 1930 "F'),
+                Buffer.from([0x94]),
+                Buffer.from("retagskonto V"),
+                Buffer.from([0x84]),
+                Buffer.from("st "),
+                Buffer.from([0x86]),
+                Buffer.from('s"\r\n'),
+            ]),
+        );
+        expect(text).toContain("Företagskonto Väst ås");
+    });
+    it("decodes a BOM export as UTF-8 (BOM preview decodes as UTF-8)", async () => {
+        const text = await preview(
+            Buffer.concat([
+                Buffer.from([0xef, 0xbb, 0xbf]),
+                Buffer.from('#FORMAT PC8\r\n#KONTO 1930 "Företagskonto Väst ås"\r\n'),
+            ]),
+        );
+        expect(text.startsWith("#FORMAT")).toBe(true);
+        expect(text).toContain("Företagskonto Väst ås");
+    });
+    it("decodes an undeclared export as Latin-1 (Undeclared preview decodes as Latin-1)", async () => {
+        const text = await preview(
+            Buffer.from('#KONTO 1930 "Företagskonto Väst ås"\r\n', "latin1"),
+        );
+        expect(text).toContain("Företagskonto Väst ås");
+    });
+});
