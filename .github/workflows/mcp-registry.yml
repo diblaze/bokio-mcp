@@ -19,7 +19,7 @@ jobs:
       # Bump the version and the SHA-256 below together (from the release's checksums.txt).
       MCP_PUBLISHER_VERSION: v1.8.6
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Install mcp-publisher
