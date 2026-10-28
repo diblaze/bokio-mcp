@@ -1,17 +1,22 @@
 name: Publish to MCP Registry
 
-# Run by hand after approving the staged release:
-#   gh workflow run mcp-registry.yml --ref main
-# The registry reads the published package version, so an unapproved version fails here.
+# A published release starts this run; it waits for approval in the mcp-registry environment.
+# Approve it after approving the staged version on npm. Approved too early, the registry
+# returns 404 for the unpublished version: re-run the failed job once npm serves it
+# and approve it again.
+# Manual fallback: gh workflow run mcp-registry.yml --ref main
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions: {}
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'release' && startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
+    environment: mcp-registry
     permissions:
       contents: read
       id-token: write # GitHub OIDC login to the registry, no stored secret
