@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { lintServer, parseToolDefinitions } from "mcp-tdqs";
@@ -188,7 +189,7 @@ describe("credit notes, payments and settlements", () => {
 
 describe("download and body shapes", () => {
     it("download refuses to overwrite an existing file (Existing file is not overwritten)", async () => {
-        const { mkdtempSync, writeFileSync, readFileSync } = await import("node:fs");
+        const { mkdtempSync, writeFileSync } = await import("node:fs");
         const { tmpdir } = await import("node:os");
         const { join } = await import("node:path");
         const dir = mkdtempSync(join(tmpdir(), "bokio-test-"));
@@ -351,11 +352,56 @@ describe("bank payments", () => {
 
 describe("distribution", () => {
     it("server version equals package version (Server version equals package version)", async () => {
-        const { readFileSync } = await import("node:fs");
         const client = await connect();
         const pkg = JSON.parse(readFileSync("package.json", "utf8"));
         expect(client.getServerVersion()?.version).toBe(pkg.version);
         await client.close();
+    });
+
+    const json = (path: string) => JSON.parse(readFileSync(path, "utf8"));
+
+    it("server.json names the published package (Registry name matches the package manifest)", async () => {
+        const pkg = json("package.json");
+        const sj = json("server.json");
+        expect(pkg.mcpName).toBe("io.github.diblaze/bokio-mcp");
+        expect(sj.name).toBe(pkg.mcpName);
+        expect(sj.packages).toHaveLength(1);
+        expect(sj.packages[0]).toMatchObject({
+            registryType: "npm",
+            identifier: pkg.name,
+            transport: { type: "stdio" },
+        });
+        expect(sj.description.length).toBeLessThanOrEqual(100);
+    });
+
+    it("server.json version tracks the package (Registry metadata version equals package version)", async () => {
+        const pkg = json("package.json");
+        const sj = json("server.json");
+        expect(sj.version).toBe(pkg.version);
+        expect(sj.packages[0].version).toBe(pkg.version);
+        const extra = json("release-please-config.json").packages["."]["extra-files"];
+        for (const jsonpath of ["$.version", "$.packages[0].version"])
+            expect(extra).toContainEqual({ type: "json", path: "server.json", jsonpath });
+    });
+
+    it("server.json lists the configuration variables (Registry metadata lists the documented variables)", async () => {
+        const readme = readFileSync("README.md", "utf8");
+        const documented = [...readme.matchAll(/^\| `(BOKIO_\w+)`/gm)].map((m) => m[1]).sort();
+        const read = new Set<string>();
+        for (const f of readdirSync("src").filter((n) => n.endsWith(".ts")))
+            for (const m of readFileSync(`src/${f}`, "utf8").matchAll(
+                /process\.env(?:\.|\[["'])(BOKIO_\w+)/g,
+            ))
+                read.add(m[1]);
+        expect([...read].sort()).toEqual(documented);
+        const vars: { name: string; isRequired?: boolean; isSecret?: boolean }[] =
+            json("server.json").packages[0].environmentVariables;
+        expect(vars.map((v) => v.name).sort()).toEqual(documented);
+        expect(vars.find((v) => v.name === "BOKIO_TOKEN")).toMatchObject({
+            isRequired: true,
+            isSecret: true,
+        });
+        expect(vars.filter((v) => v.isSecret).map((v) => v.name)).toEqual(["BOKIO_TOKEN"]);
     });
 });
 

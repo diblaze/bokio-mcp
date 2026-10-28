@@ -2,6 +2,7 @@
   "name": "bokio-mcp",
   "version": "0.5.0",
   "description": "Model Context Protocol server for the Bokio accounting API (private Bearer-token auth, single-company)",
+  "mcpName": "io.github.diblaze/bokio-mcp",
   "type": "module",
   "bin": {
     "bokio-mcp": "dist/index.js"

@@ -18,6 +18,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `test/sie.test.ts` | Parser and computation tests on synthetic SIE built in the file. |
 | `scripts/smoke.mjs` | Spawns built `dist/index.js` directly and through a symlink (as npm installs bins), runs the MCP handshake + `tools/list`, asserts read-only surface (writes hidden, all annotated). Run via `pnpm run smoke`. |
 | `scripts/pack-check.mjs` | `npm pack --dry-run`: tarball holds only `dist/`, README, LICENSE, `package.json`. Run via `pnpm run pack:check` (CI). |
+| `server.json` | MCP Registry metadata (`io.github.diblaze/bokio-mcp`, matches `mcpName` in `package.json`). release-please bumps both version fields; not in the tarball. |
 | `biome.json` | Biome config: 4-space, 100 cols, double quotes, semicolons, organize-imports. |
 | `pnpm-workspace.yaml` | Carries `allowBuilds`: `esbuild: true` (pnpm 11 needs it for vitest), `lefthook: false` (hooks come from `prepare`). |
 | `LLM.md` | Setup guide addressed to an AI agent; linked from the README, not shipped in the tarball. |
