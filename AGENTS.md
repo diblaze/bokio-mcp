@@ -25,6 +25,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 | `lefthook.yml` | Git hooks, installed by `pnpm install` (`prepare: lefthook install --reset-hooks-path`, which also clears an old `core.hooksPath`): pre-commit Biome on staged files + actionlint on staged workflows (skipped when not on PATH), commit-msg commitlint (Conventional Commits, built-in config). |
 | `.github/workflows/release-please.yml` | On push to `main`: release-please opens or updates the release PR; when a release is created, the `publish` job runs `npm stage publish` (OIDC, Node 24). Needs the `RELEASE_PLEASE_TOKEN` secret. |
 | `release-please-config.json`, `.release-please-manifest.json` | release-please config (node, `bump-minor-pre-major`, `v`-prefixed tags, changelog sections Added/Fixed/Changed) and the last released version. |
+| `.github/workflows/mcp-registry.yml` | Manual dispatch on `main` only: installs pinned `mcp-publisher` (SHA-256 checked), logs in with GitHub OIDC and publishes `server.json` to the MCP Registry. |
 | `.github/workflows/ci.yml` | CI: Node matrix [22, 24], pnpm, commitlint over the PR's commits → actionlint (+ shellcheck) → `biome ci` → typecheck → test → build → smoke → pack:check. |
 | `.github/CODEOWNERS` | `* @diblaze` — required reviewer on PRs. |
 
@@ -56,7 +57,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transp
 - **Package manager is pnpm only** (`packageManager: pnpm@11.9.0`), which requires **Node ≥ 22.13** to develop (users only need Node ≥ 22). Never use npm/yarn. `corepack enable` first.
 - **Lint/format is Biome, 4-space.** Run `pnpm run format` (writes) / `pnpm run lint` (checks). CI runs `pnpm exec biome ci` and it must be clean.
 - **`main` is branch-protected**: external changes need a PR with green CI (`build (22)`, `build (24)`) + 1 approval (CODEOWNERS @diblaze). The owner has admin bypass.
-- Releases: release-please (`.github/workflows/release-please.yml`) keeps a release PR open on every push to `main`, with the next version and `CHANGELOG.md` entry derived from the commit types (`feat` → minor before 1.0, `fix` → patch; other types never release on their own). Merging it tags `vX.Y.Z`, creates the GitHub Release and stages the package on npm via trusted publishing; the owner approves the staged version on npm with 2FA. Never bump `version` or edit `CHANGELOG.md` by hand, and agents never run `npm publish`.
+- Releases: release-please (`.github/workflows/release-please.yml`) keeps a release PR open on every push to `main`, with the next version and `CHANGELOG.md` entry derived from the commit types (`feat` → minor before 1.0, `fix` → patch; other types never release on their own). Merging it tags `vX.Y.Z`, creates the GitHub Release and stages the package on npm via trusted publishing; the owner approves the staged version on npm with 2FA, then runs `gh workflow run mcp-registry.yml --ref main` to list the version in the MCP Registry. Never bump `version` or edit `CHANGELOG.md` by hand, and agents never run `npm publish`.
 
 ### Adding or changing a tool
 

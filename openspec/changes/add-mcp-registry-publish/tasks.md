@@ -18,12 +18,12 @@
 - [x] 1.6 Docs: in `README.md` Install, add one line giving its MCP Registry name `io.github.diblaze/bokio-mcp` (no claim that it is listed; that is only true after the first dispatch). In `AGENTS.md` Key Files, add a `server.json` row: registry metadata, its version is bumped by release-please and it does not ship. Verify: `rg -n 'io.github.diblaze/bokio-mcp' README.md AGENTS.md`
 
 ## 2. Registry publish workflow (commit `ci: publish to the MCP Registry on dispatch`)
-- [ ] 2.1 Check `yq -e '(.on | keys) == ["workflow_dispatch"]' .github/workflows/mcp-registry.yml && ! rg -q 'mcp-publisher' .github/workflows/release-please.yml`. It proves scenario "Release does not publish to the registry by itself".
-- [ ] 2.2 Check `yq -e '.jobs.publish.if == "github.ref == '"'"'refs/heads/main'"'"'"' .github/workflows/mcp-registry.yml`. It proves scenario "Dispatch from another branch is refused".
-- [ ] 2.3 Check `yq -e '.permissions == {} and .jobs.publish.permissions["id-token"] == "write"' .github/workflows/mcp-registry.yml && rg -q 'mcp-publisher login github-oidc' .github/workflows/mcp-registry.yml && ! rg -q 'secrets\.' .github/workflows/mcp-registry.yml`. It proves scenario "Publish authenticates without a stored secret".
-- [ ] 2.4 Check `rg -q 'MCP_PUBLISHER_VERSION: v1\.8\.6' .github/workflows/mcp-registry.yml && rg -q '1fbe93fc0783c2394d8012c8d6e50a59e98cb2cc2d216264cc69f405d0e21340  mcp-publisher.tar.gz" \| sha256sum -c' .github/workflows/mcp-registry.yml && ! rg -q 'latest' .github/workflows/mcp-registry.yml`. It proves scenario "Tampered or unpinned publisher is rejected".
-- [ ] 2.5 No local check: the registry itself rejects a version npm does not serve (E3), and the workflow has no publish-to-npm step (2.6). Scenario "Unapproved npm version is not listed" is proven by that registry behaviour, not by a grep.
-- [ ] 2.6 Create a new `.github/workflows/mcp-registry.yml` (E10, E11):
+- [x] 2.1 Check `yq -e '(.on | keys) == ["workflow_dispatch"]' .github/workflows/mcp-registry.yml && ! rg -q 'mcp-publisher' .github/workflows/release-please.yml`. It proves scenario "Release does not publish to the registry by itself".
+- [x] 2.2 Check `yq -e '.jobs.publish.if == "github.ref == '"'"'refs/heads/main'"'"'"' .github/workflows/mcp-registry.yml`. It proves scenario "Dispatch from another branch is refused".
+- [x] 2.3 Check `yq -e '.permissions == {} and .jobs.publish.permissions["id-token"] == "write"' .github/workflows/mcp-registry.yml && rg -q 'mcp-publisher login github-oidc' .github/workflows/mcp-registry.yml && ! rg -q 'secrets\.' .github/workflows/mcp-registry.yml`. It proves scenario "Publish authenticates without a stored secret".
+- [x] 2.4 Check `rg -q 'MCP_PUBLISHER_VERSION: v1\.8\.6' .github/workflows/mcp-registry.yml && rg -q '1fbe93fc0783c2394d8012c8d6e50a59e98cb2cc2d216264cc69f405d0e21340  mcp-publisher.tar.gz" \| sha256sum -c' .github/workflows/mcp-registry.yml && ! rg -q 'latest' .github/workflows/mcp-registry.yml`. It proves scenario "Tampered or unpinned publisher is rejected".
+- [x] 2.5 No local check: the registry itself rejects a version npm does not serve (E3), and the workflow has no publish-to-npm step (2.6). Scenario "Unapproved npm version is not listed" is proven by that registry behaviour, not by a grep.
+- [x] 2.6 Create a new `.github/workflows/mcp-registry.yml` (E10, E11):
   - `name: Publish to MCP Registry`
   - `on:` mapping with only `workflow_dispatch:` (a scalar has no keys for check 2.1)
   - top-level `permissions: {}`
@@ -34,7 +34,7 @@
   - step `run: ./mcp-publisher publish`
 
   Add a comment that says to bump the version and the hash together. Verify: `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.12 -color` passes, and 2.1–2.4 pass.
-- [ ] 2.7 Docs: in `AGENTS.md`, add a Key Files row for `.github/workflows/mcp-registry.yml`. In the Releases paragraph, add: "after approving on npm, run `gh workflow run mcp-registry.yml --ref main` to list the version in the MCP Registry". Add the same step to `CONTRIBUTING.md` `## Releases` (line 38). Verify: `rg -n 'mcp-registry.yml' AGENTS.md CONTRIBUTING.md`
+- [x] 2.7 Docs: in `AGENTS.md`, add a Key Files row for `.github/workflows/mcp-registry.yml`. In the Releases paragraph, add: "after approving on npm, run `gh workflow run mcp-registry.yml --ref main` to list the version in the MCP Registry". Add the same step to `CONTRIBUTING.md` `## Releases` (line 38). Verify: `rg -n 'mcp-registry.yml' AGENTS.md CONTRIBUTING.md`
 
 ## 3. Check
-- [ ] 3.1 `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check && docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.12 && d="$(mktemp -d)" && curl -fsSL -o "$d/p.tgz" https://github.com/modelcontextprotocol/registry/releases/download/v1.8.6/mcp-publisher_linux_amd64.tar.gz && echo "1fbe93fc0783c2394d8012c8d6e50a59e98cb2cc2d216264cc69f405d0e21340  $d/p.tgz" | sha256sum -c - && tar xzf "$d/p.tgz" -C "$d" mcp-publisher && "$d/mcp-publisher" validate server.json`
+- [x] 3.1 `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check && docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.12 && d="$(mktemp -d)" && curl -fsSL -o "$d/p.tgz" https://github.com/modelcontextprotocol/registry/releases/download/v1.8.6/mcp-publisher_linux_amd64.tar.gz && echo "1fbe93fc0783c2394d8012c8d6e50a59e98cb2cc2d216264cc69f405d0e21340  $d/p.tgz" | sha256sum -c - && tar xzf "$d/p.tgz" -C "$d" mcp-publisher && "$d/mcp-publisher" validate server.json`
