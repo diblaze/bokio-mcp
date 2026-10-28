@@ -24,7 +24,7 @@ You need three things:
 
 ## Install
 
-The server runs straight from npm, with no clone needed. It speaks MCP over stdio, so your MCP client starts it for you.
+The server runs straight from npm, with no clone needed. It speaks MCP over stdio, so your MCP client starts it for you. Its [MCP Registry](https://registry.modelcontextprotocol.io) name is `io.github.diblaze/bokio-mcp`.
 
 Using an AI agent? Paste https://raw.githubusercontent.com/diblaze/bokio-mcp/main/LLM.md into it and ask it to install bokio-mcp.
 
