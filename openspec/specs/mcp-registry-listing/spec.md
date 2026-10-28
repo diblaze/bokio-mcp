@@ -29,24 +29,6 @@ The system SHALL list in the server metadata every environment variable the serv
 - **WHEN** their variable names are compared
 - **THEN** the three name sets are equal, `BOKIO_TOKEN` is required and secret, and no other variable is secret
 
-### Requirement: Registry publish runs only on maintainer request from the default branch
-The system SHALL publish to the official MCP Registry only when a maintainer starts the registry workflow on the default branch. The workflow SHALL use the job's short-lived identity and no stored secret.
-
-#### Scenario: Release does not publish to the registry by itself
-- **GIVEN** a release that has just been created and staged on npm
-- **WHEN** GitHub evaluates workflow triggers for that push or release
-- **THEN** the registry workflow does not run; it runs only on manual dispatch
-
-#### Scenario: Dispatch from another branch is refused
-- **GIVEN** a maintainer dispatches the registry workflow on a branch other than the default branch
-- **WHEN** the workflow evaluates its publish job
-- **THEN** the job is skipped and nothing is published
-
-#### Scenario: Publish authenticates without a stored secret
-- **GIVEN** the registry workflow
-- **WHEN** it logs in to the registry
-- **THEN** it uses the GitHub OIDC identity of the job and references no repository secret
-
 ### Requirement: Publisher tool is pinned and verified
 The system SHALL run a publisher tool of a fixed version whose archive matches a recorded SHA-256 hash. If the archive does not match, the system SHALL stop before logging in.
 
@@ -60,5 +42,33 @@ The system SHALL list a version only after npm serves it, and SHALL NOT itself p
 
 #### Scenario: Unapproved npm version is not listed
 - **GIVEN** the package version in the metadata is staged on npm but not yet approved
-- **WHEN** the maintainer dispatches the registry workflow
+- **WHEN** an approved registry run publishes
 - **THEN** the registry rejects the publish because the version is not found, the run fails, and the existing listing is unchanged
+
+### Requirement: Registry publish starts on release and waits for maintainer approval
+The system SHALL start the registry publish when a release is published, and when a maintainer starts it by hand on the default branch. No run SHALL publish until a maintainer approves it. The workflow SHALL use the job's short-lived identity and no stored secret.
+
+#### Scenario: Release starts a held registry publish
+- **GIVEN** a release that has just been published for tag `vX.Y.Z`
+- **WHEN** GitHub evaluates workflow triggers
+- **THEN** the registry workflow starts from that tag, and its publish job waits for a maintainer's approval before any step runs
+
+#### Scenario: Unapproved run publishes nothing
+- **GIVEN** a registry run that waits for approval
+- **WHEN** a maintainer rejects it or it expires
+- **THEN** no step runs and the listing is unchanged
+
+#### Scenario: Release run publishes the released metadata
+- **GIVEN** a registry run started by the release of tag `vX.Y.Z`
+- **WHEN** it reads the server metadata
+- **THEN** it reads the metadata at that tag, whose version is `X.Y.Z`
+
+#### Scenario: Dispatch from another branch is refused
+- **GIVEN** a maintainer dispatches the registry workflow on a branch or tag other than the default branch
+- **WHEN** the workflow evaluates its publish job
+- **THEN** the job is skipped and nothing is published
+
+#### Scenario: Publish authenticates without a stored secret
+- **GIVEN** the registry workflow
+- **WHEN** it logs in to the registry
+- **THEN** it uses the GitHub OIDC identity of the job and references no repository secret
