@@ -2,6 +2,21 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/). Entries from 0.4.0 on are generated from commit messages by release-please.
 
+## [0.6.0](https://github.com/diblaze/bokio-mcp/compare/v0.5.0...v0.6.0) (2026-10-28)
+
+
+### Added
+
+* **cache:** add read cache cleared by writes ([79258c0](https://github.com/diblaze/bokio-mcp/commit/79258c02500e318e34bc3edc0403aebd0e481ce8))
+* **dist:** declare MCP Registry name and server.json ([ee070a1](https://github.com/diblaze/bokio-mcp/commit/ee070a1d569c20fd346290141000bda4762f0ba2))
+* **sie:** reuse fiscal years and exports 5 min ([2eedf62](https://github.com/diblaze/bokio-mcp/commit/2eedf623a4a20e8386b7eb4b4c89747fd215aa4f))
+
+
+### Fixed
+
+* **raw:** keep raw_get path inside /v1 ([d4ab0c3](https://github.com/diblaze/bokio-mcp/commit/d4ab0c32e56a67ec9d0b1c63aa0603ae01c06577))
+* **sie:** decode preview by declared encoding ([da5ab88](https://github.com/diblaze/bokio-mcp/commit/da5ab88d4931e52a62f037e5b23b22797865430a))
+
 ## [0.5.0](https://github.com/diblaze/bokio-mcp/compare/v0.4.0...v0.5.0) (2026-10-26)
 
 
