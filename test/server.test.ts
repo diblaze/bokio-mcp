@@ -114,6 +114,21 @@ describe("input bounds", () => {
         vi.unstubAllGlobals();
         await client.close();
     });
+
+    it("default page size is 100 (List call without pageSize asks for 100)", async () => {
+        const client = await connect();
+        process.env.BOKIO_TOKEN = "a".repeat(40);
+        process.env.BOKIO_COMPANY_ID = "co";
+        const f = vi.fn(
+            async () => new Response("{}", { headers: { "content-type": "application/json" } }),
+        );
+        vi.stubGlobal("fetch", f);
+        const res = await client.callTool({ name: "bokio_list_invoices", arguments: {} });
+        expect(res.isError).toBeFalsy();
+        expect(new URL(String(f.mock.calls[0][0])).searchParams.get("pageSize")).toBe("100");
+        vi.unstubAllGlobals();
+        await client.close();
+    });
 });
 
 async function connect() {
@@ -773,6 +788,36 @@ describe("tool definitions", () => {
             total += d.length;
         }
         expect(total).toBeLessThanOrEqual(14_000);
+    });
+
+    type Tool = Awaited<ReturnType<typeof listed>>[number];
+    async function namesAnother(scope: (t: Tool) => boolean) {
+        const tools = await listed();
+        const names = new Set(tools.map((t) => t.name));
+        const scoped = tools.filter(scope);
+        expect(scoped.length).toBeGreaterThan(0);
+        for (const t of scoped) {
+            const named = (t.description ?? "").match(/bokio_\w+/g) ?? [];
+            expect(
+                named.some((n) => n !== t.name && names.has(n)),
+                `${t.name}: ${t.description}`,
+            ).toBe(true);
+        }
+    }
+
+    it("list tools state paging and filters (List descriptions state paging and filter syntax)", async () => {
+        const withQuery = (await listed()).filter((t) => "query" in props(t));
+        expect(withQuery.length).toBe(12);
+        for (const t of withQuery) {
+            const d = t.description ?? "";
+            expect(d, t.name).toContain("query");
+            expect(d, t.name).toMatch(/==|>=|<=|~/);
+            if ("page" in props(t)) expect(d, t.name).toMatch(/\b100\b/);
+        }
+    });
+
+    it("list tools name an alternative (List tools name an alternative)", async () => {
+        await namesAnother((t) => "query" in props(t));
     });
 
     it("savePath says where files land (Save path states where files land)", async () => {
