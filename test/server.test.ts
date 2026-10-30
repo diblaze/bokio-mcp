@@ -820,6 +820,10 @@ describe("tool definitions", () => {
         await namesAnother((t) => "query" in props(t));
     });
 
+    it("result-schema tools name an alternative (Tools with a result schema name an alternative)", async () => {
+        await namesAnother((t) => t.annotations?.readOnlyHint === true && !!t.outputSchema);
+    });
+
     it("savePath says where files land (Save path states where files land)", async () => {
         const withSave = (await listed()).filter((t) => "savePath" in props(t));
         expect(withSave.length).toBe(4);
