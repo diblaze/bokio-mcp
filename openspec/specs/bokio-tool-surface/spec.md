@@ -148,3 +148,11 @@ The system SHALL accept a raw GET path only when it is built from letters, digit
 - **GIVEN** the company id is `co`
 - **WHEN** the raw GET tool is called with `/companies/{companyId}/tag-groups` and query parameters `{ page: 2 }`
 - **THEN** exactly one GET is sent to `<base>/companies/co/tag-groups?page=2`
+
+### Requirement: List tools default to 100 items per page
+The system SHALL request 100 items per page from Bokio when a paged list tool is called without `pageSize`, and the page size given otherwise.
+
+#### Scenario: List call without pageSize asks for 100
+- **GIVEN** a paged list tool and a stubbed Bokio API
+- **WHEN** it is called without `pageSize`
+- **THEN** the request carries `pageSize=100`
