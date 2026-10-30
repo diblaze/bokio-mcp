@@ -836,6 +836,16 @@ describe("tool definitions", () => {
         for (const t of schemaless) expect(t.description, t.name).toMatch(/return/i);
     });
 
+    it("write tools name the next tool (Write tools name the next or alternative tool)", async () => {
+        await namesAnother((t) => t.annotations?.readOnlyHint === false);
+    });
+
+    it("write tools state their result (Write tools state their result)", async () => {
+        const writes = (await listed()).filter((t) => t.annotations?.readOnlyHint === false);
+        expect(writes.length).toBe(23);
+        for (const t of writes) expect(t.description, t.name).toMatch(/return/i);
+    });
+
     it("savePath says where files land (Save path states where files land)", async () => {
         const withSave = (await listed()).filter((t) => "savePath" in props(t));
         expect(withSave.length).toBe(4);

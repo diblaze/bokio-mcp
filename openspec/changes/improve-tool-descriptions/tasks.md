@@ -21,9 +21,9 @@
 - [x] 4.3 Rewrite `company_info`, the 11 `get_*`, 4 `download_*` and `raw_get` in `src/index.ts`: what comes back with 3–5 key fields from the OpenAPI schema (E13 schemas, `company-api.yaml:8877`), the list tool for ids, drafts fail on PDF downloads (E17), raw_get returns Bokio's body and names `bokio_list_*` tools to prefer; fix `bokio_get_fiscal_year` "all of them" (E12). Do not repeat not-found or `savePath` facts (E18). Verify: 4.1, 4.2, 1.1 pass.
 
 ## 5. Write tools
-- [ ] 5.1 Failing test `test/server.test.ts::tool definitions › write tools name the next tool (Write tools name the next or alternative tool)`: every `readOnlyHint` false tool names another listed `bokio_*`. Proves scenario "Write tools name the next or alternative tool".
-- [ ] 5.2 Failing test `test/server.test.ts::tool definitions › write tools state their result (Write tools state their result)`: every `readOnlyHint` false tool matches `/return/i`. Proves scenario "Write tools state their result".
-- [ ] 5.3 Rewrite the 23 write tools in `src/index.ts:722-1319`: keep `WRITE.` (E9) and draft/undo facts; name the follow-up or read tool (E22); result as Bokio's response, or the named object only where the OpenAPI response schema shows it (E19). Verify: 5.1, 5.2, 1.1 pass and `test/readonly.test.ts` passes.
+- [x] 5.1 Failing test `test/server.test.ts::tool definitions › write tools name the next tool (Write tools name the next or alternative tool)`: every `readOnlyHint` false tool names another listed `bokio_*`. Proves scenario "Write tools name the next or alternative tool".
+- [x] 5.2 Failing test `test/server.test.ts::tool definitions › write tools state their result (Write tools state their result)`: every `readOnlyHint` false tool matches `/return/i`. Proves scenario "Write tools state their result".
+- [x] 5.3 Rewrite the 23 write tools in `src/index.ts:722-1319`: keep `WRITE.` (E9) and draft/undo facts; name the follow-up or read tool (E22); result as Bokio's response, or the named object only where the OpenAPI response schema shows it (E19). Verify: 5.1, 5.2, 1.1 pass and `test/readonly.test.ts` passes.
 
 ## 6. Check
-- [ ] 6.1 `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check`
+- [x] 6.1 `pnpm exec biome ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run smoke && pnpm run pack:check`
