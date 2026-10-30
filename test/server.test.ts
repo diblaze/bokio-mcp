@@ -824,6 +824,18 @@ describe("tool definitions", () => {
         await namesAnother((t) => t.annotations?.readOnlyHint === true && !!t.outputSchema);
     });
 
+    it("read tools name an alternative (Every read tool names an alternative)", async () => {
+        await namesAnother((t) => t.annotations?.readOnlyHint === true);
+    });
+
+    it("schemaless read tools state their result (Read tools without an output schema state their result)", async () => {
+        const schemaless = (await listed()).filter(
+            (t) => t.annotations?.readOnlyHint === true && !t.outputSchema,
+        );
+        expect(schemaless.length).toBeGreaterThan(0);
+        for (const t of schemaless) expect(t.description, t.name).toMatch(/return/i);
+    });
+
     it("savePath says where files land (Save path states where files land)", async () => {
         const withSave = (await listed()).filter((t) => "savePath" in props(t));
         expect(withSave.length).toBe(4);
