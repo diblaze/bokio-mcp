@@ -352,7 +352,7 @@ tool(
 
 tool(
     "bokio_chart_of_accounts",
-    "List the company's BAS chart of accounts: account numbers with names. Use it to find the account number the ledger and balance tools take; bokio_get_account reads a single account.",
+    "List the complete BAS chart of accounts in one unpaged call: account numbers with names. Narrow it with query on account, name or accountType, such as account>=3000&&account<=3999. Use bokio_get_account for one account; the ledger and balance tools take its number.",
     { companyId, query },
     async (a) =>
         ok(
@@ -688,7 +688,7 @@ tool(
 
 tool(
     "bokio_list_journal_entries",
-    "List journal entries (verifikationer) with paging, optionally between from and to or narrowed by a raw query filter. For the postings on one account use bokio_account_ledger.",
+    "List journal entries (verifikationer), 100 per page by default; the response carries totalPages. Filter with query on title, journalEntryNumber or date, such as title~invoice 1234; from and to are ANDed with query. Use bokio_get_journal_entry for one entry and bokio_account_ledger for the postings on one account.",
     {
         companyId,
         page,
@@ -770,7 +770,7 @@ tool(
 
 tool(
     "bokio_list_invoices",
-    "List customer invoices with paging and a raw query filter. Revenue booked as journal entries is not listed here; use bokio_account_ledger or bokio_open_items for that.",
+    "List customer invoices, 100 per page by default; the response carries totalPages. Filter with query on status, invoiceDate, dueDate, currency or totalAmount, such as invoiceDate>=2026-01-01&&currency==SEK. Revenue booked as journal entries is not listed; use bokio_account_ledger or bokio_open_items, and bokio_get_invoice for one invoice.",
     { companyId, page, pageSize, query },
     async (a) =>
         okStructured(
@@ -889,7 +889,7 @@ tool(
 
 tool(
     "bokio_list_invoice_payments",
-    "List the payments registered on one invoice, with paging. Fees and currency differences are listed by bokio_list_invoice_settlements.",
+    "List the payments registered on one invoice, 100 per page by default; the response carries totalPages. Filter with query on date or sumBaseCurrency, such as date>=2026-01-01. Fees and currency differences are listed by bokio_list_invoice_settlements.",
     { invoiceId, companyId, page, pageSize, query },
     async (a) =>
         okStructured(
@@ -903,7 +903,7 @@ tool(
 
 tool(
     "bokio_list_invoice_settlements",
-    "List the settlements on one invoice: currency differences, bank fees and payment-service fees. Payments are listed by bokio_list_invoice_payments.",
+    "List the settlements on one invoice (currency differences, bank fees and payment-service fees), 100 per page by default; the response carries totalPages. Filter with query on date or sumBaseCurrency, such as date>=2026-01-01. Payments are listed by bokio_list_invoice_payments.",
     { invoiceId, companyId, page, pageSize, query },
     async (a) =>
         okStructured(
@@ -941,7 +941,7 @@ tool(
 
 tool(
     "bokio_list_credit_notes",
-    "List credit notes (kreditfakturor) with paging and a raw query filter. Customer invoices are listed by bokio_list_invoices.",
+    "List credit notes (kreditfakturor), 100 per page by default; the response carries totalPages. Filter with query on status, creditDate, dueDate, currency or totalAmount, such as creditDate>=2026-01-01. Use bokio_get_credit_note for one credit note; customer invoices are listed by bokio_list_invoices.",
     { companyId, page, pageSize, query },
     async (a) =>
         okStructured(
@@ -1042,7 +1042,7 @@ tool(
 
 tool(
     "bokio_list_suppliers",
-    "List suppliers (leverantörer) with paging and a raw query filter. Their invoices are listed by bokio_list_supplier_invoices.",
+    "List suppliers (leverantörer), 100 per page by default; the response carries totalPages. Filter with query on name, orgNumber or vatNumber, such as name~acme. Use bokio_get_supplier for one supplier; their invoices are listed by bokio_list_supplier_invoices.",
     { companyId, page, pageSize, query },
     async (a) =>
         okStructured(
@@ -1089,7 +1089,7 @@ tool(
 
 tool(
     "bokio_list_supplier_invoices",
-    "List supplier invoices (leverantörsfakturor) with paging and a raw query filter. For unpaid supplier debt by age use bokio_open_items on account 2440.",
+    "List supplier invoices (leverantörsfakturor), 100 per page by default; the response carries totalPages. Filter with query on supplierRef.id, invoiceNumber, invoiceDate, dueDate or totalAmount, such as dueDate<=2026-06-30. Use bokio_get_supplier_invoice for one invoice and bokio_open_items on account 2440 for unpaid supplier debt by age.",
     { companyId, page, pageSize, query },
     async (a) =>
         okStructured(
@@ -1159,7 +1159,7 @@ tool(
 
 tool(
     "bokio_list_bank_payments",
-    "List bank payments with paging. Bokio returns only payments created by this integration, and creating them is deliberately not exposed.",
+    "List bank payments, 100 per page by default; the response carries totalPages. Bokio returns only payments created by this integration, and creating them is not exposed. Filter with query on status, amount, paymentDate or createdDateTime, such as paymentDate>=2026-01-01; bokio_get_bank_payment reads one payment.",
     { companyId, page, pageSize, query },
     async (a) =>
         okStructured(
@@ -1180,7 +1180,7 @@ tool(
 
 tool(
     "bokio_list_customers",
-    "List customers with paging and a raw query filter. Use bokio_get_customer for one customer's details.",
+    "List customers in descending customer-number order, 100 per page by default; the response carries totalPages. Filter with query on name, customerNumber, orgNumber or vatNumber, such as name~acme. Use bokio_get_customer for one customer and bokio_list_invoices for their invoices.",
     { companyId, page, pageSize, query },
     async (a) =>
         okStructured(
@@ -1229,7 +1229,7 @@ tool(
 
 tool(
     "bokio_list_items",
-    "List items (artiklar), the products and services used on invoice lines, with paging. Use bokio_get_item for one item.",
+    "List items (artiklar), the products and services used on invoice lines, 100 per page by default; the response carries totalPages. Filter with query on description, itemType, unitPrice or taxRate, such as description~consulting. Use bokio_get_item for one item.",
     { companyId, page, pageSize, query },
     async (a) =>
         okStructured(await bokioRequest({ path: `${cbase(a.companyId)}/items`, query: paging(a) })),
@@ -1275,7 +1275,7 @@ tool(
 
 tool(
     "bokio_list_uploads",
-    "List uploaded files and receipts (kvitton) with paging. Use bokio_download_upload for a file's content.",
+    "List uploaded files and receipts (kvitton), 100 per page by default; the response carries totalPages. Filter with query on description or journalEntryId, such as description~receipt. Use bokio_get_upload for one upload and bokio_download_upload for its content.",
     { companyId, page, pageSize, query },
     async (a) =>
         okStructured(
