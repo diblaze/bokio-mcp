@@ -336,7 +336,7 @@ tool(
 
 tool(
     "bokio_list_fiscal_years",
-    "List the company's fiscal years with their ids and start and end dates. The ids feed bokio_download_sie and the fiscalYearId of bokio_account_balances.",
+    "List the company's fiscal years with their ids and start and end dates; returns Bokio's first page, up to 25 years. The ids feed bokio_get_fiscal_year, bokio_download_sie and the fiscalYearId of bokio_account_balances.",
     { companyId },
     async (a) => okStructured(await bokioRequest({ path: `${cbase(a.companyId)}/fiscal-years` })),
     listOutput,
@@ -430,7 +430,7 @@ const SIGN = "Amounts in ledger sign: debit positive, credit negative.";
 
 tool(
     "bokio_account_balances",
-    `Compute the opening balance, movement and balance per account at a date from the SIE export. Use it for what is on an account at a date; bokio_account_ledger shows the individual lines. ${SIGN}`,
+    `Compute the opening balance, movement and balance per account at a date from the SIE export. With fiscalYearId only that year is read and date defaults to its last day; otherwise date defaults to today and the year covering it is read. Use it for an account at a date; bokio_account_ledger shows the individual lines. ${SIGN}`,
     {
         companyId,
         date: isoDay
@@ -466,7 +466,7 @@ tool(
 
 tool(
     "bokio_account_ledger",
-    `List the postings on one account between two dates with a running balance, ordered by date, series and number, computed from the SIE export. Annulled verifications are kept and flagged cancelled; bokio_list_journal_entries lists whole verifications instead. ${SIGN}`,
+    `List one account's postings between from and to with a running balance, in date order, from the SIE export. A from before the first fiscal year starts at that year; the balance restarts at each fiscal year's opening. Annulled verifications are kept and flagged cancelled; bokio_list_journal_entries lists whole verifications. ${SIGN}`,
     { companyId, account, from: fromDay, to: toDay },
     async (a) => {
         if (a.from > a.to) throw new Error("from is after to");
@@ -506,7 +506,7 @@ const shift = (d: string, days: number) =>
 
 tool(
     "bokio_find_duplicates",
-    `Find possible double bookings in the SIE export: lines with the same account and amount from different verifications within windowDays of each other. Annulled verifications are skipped; to check against a bank statement use bokio_reconcile_bank. ${SIGN}`,
+    `Find possible double bookings in the SIE export: groups of lines with the same account and amount between from and to, from more than one verification, each within windowDays of the previous one. Annulled verifications and zero lines are skipped; to check against a bank statement use bokio_reconcile_bank. ${SIGN}`,
     {
         companyId,
         from: fromDay,
@@ -518,7 +518,7 @@ tool(
             .min(0)
             .max(90)
             .default(7)
-            .describe("Max days between the two bookings; default 7."),
+            .describe("Max days between consecutive bookings in a group; default 7."),
     },
     async (a) => {
         if (a.from > a.to) throw new Error("from is after to");
@@ -534,7 +534,7 @@ tool(
 
 tool(
     "bokio_reconcile_bank",
-    `Match bank statement rows against one ledger account in the SIE export: each row, in date order, takes the earliest unmatched ledger line of the same amount within toleranceDays. Returns matched pairs, unmatched rows on both sides, suspected duplicates and totals (difference = ledger minus bank). ${SIGN}`,
+    `Match bank statement rows to one ledger account in the SIE export, reading lines from toleranceDays before the first row to toleranceDays after the last. Returns matched pairs, unmatched rows on both sides, suspected duplicates and totals (difference = ledger minus bank). For double bookings over a period use bokio_find_duplicates. ${SIGN}`,
     {
         companyId,
         account: account.default(1930).describe("Ledger account to match; default 1930 (bank)."),
@@ -544,7 +544,9 @@ tool(
             .min(0)
             .max(30)
             .default(3)
-            .describe("Max days between a bank row and its ledger line; default 3."),
+            .describe(
+                "Max days between a bank row and its ledger line; each row, in date order, takes the earliest unmatched line of the same amount; default 3.",
+            ),
         rows: z
             .array(
                 z.object({
@@ -607,7 +609,7 @@ tool(
 
 tool(
     "bokio_vat_summary",
-    `Sum the VAT accounts (2610-2659) and sales accounts (3000-3999) for a period, with outputVat (negated 2610-2639), inputVat (2640-2649) and netVat = output minus input, positive when VAT is to pay. These are account totals and do not map to tax-return boxes. ${SIGN}`,
+    `Sum the VAT accounts (2610-2659) and sales accounts (3000-3999) between from and to, with outputVat (negated 2610-2639), inputVat (2640-2649) and netVat = output minus input, positive when VAT is to pay. These are account totals, not tax-return boxes; bokio_profit_and_loss gives the period result. ${SIGN}`,
     { companyId, from: fromDay, to: toDay },
     async (a) => {
         if (a.from > a.to) throw new Error("from is after to");
@@ -625,7 +627,7 @@ tool(
 
 tool(
     "bokio_profit_and_loss",
-    `Sum the result accounts (BAS classes 3-8) for a period, grouped by class or by account, with result = negated total so that profit is positive. For balance-sheet accounts use bokio_account_balances. ${SIGN}`,
+    `Sum the result accounts (BAS classes 3-8) between from and to, grouped by class or by account, with result = negated total so that profit is positive. For balance-sheet accounts use bokio_account_balances. ${SIGN}`,
     {
         companyId,
         from: fromDay,
@@ -651,7 +653,7 @@ tool(
 
 tool(
     "bokio_open_items",
-    `List unpaid items on a ledger account at asOf, matching each payment to the earliest unpaid posting of the same amount (FIFO, exact öre). Returns open items with their age in days, payments that matched nothing, the balance, and the oldest loaded year's opening balance as one unitemised amount. ${SIGN}`,
+    `List unpaid items on a ledger account at asOf, matching each payment to the earliest unpaid posting of the same amount (FIFO). It reads from 1 January of asOf's year minus lookbackYears up to asOf; the oldest year's opening balance is one unitemised amount. Items carry their age in days; bokio_account_ledger lists all postings. ${SIGN}`,
     {
         companyId,
         account: account
