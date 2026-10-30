@@ -723,7 +723,7 @@ tool(
 
 tool(
     "bokio_create_journal_entry",
-    "Create a journal entry in the live books; the debit sum must equal the credit sum. To undo one later, reverse it with bokio_reverse_journal_entry. WRITE.",
+    "Create a journal entry in the live books; the debit sum must equal the credit sum. Returns the created journal entry. To undo one later, reverse it with bokio_reverse_journal_entry. WRITE.",
     {
         companyId,
         title: z.string().optional().describe("Verification text"),
@@ -757,7 +757,7 @@ tool(
 
 tool(
     "bokio_reverse_journal_entry",
-    "Reverse (reversera) a journal entry by booking an opposite entry; the original stays in the books. Bokio only reverses entries created through the API and not linked to an invoice, once each, and not in a closed fiscal year. WRITE.",
+    "Reverse (reversera) a journal entry by booking an opposite entry; the original stays in the books. Bokio only reverses entries created through the API and not linked to an invoice, once each, and not in a closed fiscal year. Returns the journal entry Bokio sends back; book the correct entry with bokio_create_journal_entry. WRITE.",
     { journalEntryId, companyId },
     async (a) =>
         ok(
@@ -790,7 +790,7 @@ tool(
 
 tool(
     "bokio_create_invoice",
-    "Create a draft customer invoice. Then publish it with bokio_publish_invoice and record it with bokio_record_invoice. WRITE.",
+    "Create a draft customer invoice and return Bokio's response. Then publish it with bokio_publish_invoice and record it with bokio_record_invoice. WRITE.",
     { companyId, invoice: invoiceInput },
     async (a) =>
         ok(
@@ -804,7 +804,7 @@ tool(
 
 tool(
     "bokio_update_invoice",
-    "Update a draft customer invoice by id with a full set of invoice fields. WRITE.",
+    "Update a draft customer invoice by id with a full set of invoice fields and return Bokio's response. Publish it with bokio_publish_invoice when it is ready. WRITE.",
     { invoiceId, companyId, invoice: invoiceInput },
     async (a) =>
         ok(
@@ -818,7 +818,7 @@ tool(
 
 tool(
     "bokio_delete_invoice",
-    "Delete a draft customer invoice by id; this cannot be undone. WRITE.",
+    "Delete a draft customer invoice by id; this cannot be undone. Returns nothing on success; bokio_update_invoice changes a draft instead. WRITE.",
     { invoiceId, companyId },
     async (a) =>
         ok(
@@ -831,7 +831,7 @@ tool(
 
 tool(
     "bokio_publish_invoice",
-    "Publish a draft invoice, making it official and ready to send; Bokio does not email it to the customer. WRITE.",
+    "Publish a draft invoice, making it official and ready to send; Bokio does not email it to the customer. Returns the published invoice; record it next with bokio_record_invoice. WRITE.",
     { invoiceId, companyId },
     async (a) =>
         ok(
@@ -844,7 +844,7 @@ tool(
 
 tool(
     "bokio_record_invoice",
-    "Record (bokför) an invoice, posting it to the ledger; this cannot be undone through the API. WRITE.",
+    "Record (bokför) an invoice, posting it to the ledger; this cannot be undone through the API. Returns the recorded invoice; register money received with bokio_create_invoice_payment. WRITE.",
     { invoiceId, companyId },
     async (a) =>
         ok(
@@ -857,7 +857,7 @@ tool(
 
 tool(
     "bokio_create_invoice_payment",
-    "Register a payment received on an invoice, with the account the money arrived on. WRITE.",
+    "Register a payment received on an invoice, with the account the money arrived on. Returns the created payment; list them with bokio_list_invoice_payments. WRITE.",
     {
         invoiceId,
         companyId,
@@ -919,7 +919,7 @@ tool(
 
 tool(
     "bokio_create_invoice_settlement",
-    "Register a settlement on an invoice: a currency difference, a bank fee or a payment-service fee. WRITE.",
+    "Register a settlement on an invoice: a currency difference, a bank fee or a payment-service fee. Returns the created settlement; list them with bokio_list_invoice_settlements. WRITE.",
     {
         invoiceId,
         companyId,
@@ -970,7 +970,7 @@ tool(
 
 tool(
     "bokio_create_credit_note",
-    "Create a draft credit note that credits an invoice. Edit it with bokio_update_credit_note, then publish it with bokio_publish_credit_note. WRITE.",
+    "Create a draft credit note that credits an invoice. Edit it with bokio_update_credit_note, then publish it with bokio_publish_credit_note. Returns Bokio's response. WRITE.",
     { invoiceId, companyId },
     async (a) =>
         ok(
@@ -983,7 +983,7 @@ tool(
 
 tool(
     "bokio_update_credit_note",
-    "Update a draft credit note; Bokio rejects updates to published ones. WRITE.",
+    "Update a draft credit note; Bokio rejects updates to published ones. Returns the updated credit note; publish it with bokio_publish_credit_note. WRITE.",
     {
         creditNoteId,
         companyId,
@@ -1003,7 +1003,7 @@ tool(
 
 tool(
     "bokio_publish_credit_note",
-    "Publish a draft credit note, making it official and immutable. WRITE.",
+    "Publish a draft credit note, making it official and immutable. Returns the published credit note; record it next with bokio_record_credit_note. WRITE.",
     { creditNoteId, companyId },
     async (a) =>
         ok(
@@ -1016,7 +1016,7 @@ tool(
 
 tool(
     "bokio_record_credit_note",
-    "Record (bokför) a credit note, posting it to the ledger; this cannot be undone through the API. WRITE.",
+    "Record (bokför) a credit note, posting it to the ledger; this cannot be undone through the API. Returns the recorded credit note; bokio_download_credit_note fetches its PDF. WRITE.",
     { creditNoteId, companyId },
     async (a) =>
         ok(
@@ -1029,7 +1029,7 @@ tool(
 
 tool(
     "bokio_delete_credit_note",
-    "Delete a draft credit note by id; this cannot be undone. WRITE.",
+    "Delete a draft credit note by id; this cannot be undone. Returns nothing on success; bokio_update_credit_note changes a draft instead. WRITE.",
     { creditNoteId, companyId },
     async (a) =>
         ok(
@@ -1063,7 +1063,7 @@ tool(
 
 tool(
     "bokio_create_supplier",
-    "Create a supplier, optionally with bankgiro, plusgiro, bank transfer or international payment details. WRITE.",
+    "Create a supplier, optionally with bankgiro, plusgiro, bank transfer or international payment details. Returns the created supplier; use its id in bokio_create_supplier_invoice. WRITE.",
     { companyId, supplier: supplierInput },
     async (a) =>
         ok(
@@ -1077,7 +1077,7 @@ tool(
 
 tool(
     "bokio_update_supplier",
-    "Update a supplier by id with a full set of supplier fields. WRITE.",
+    "Update a supplier by id with a full set of supplier fields. Returns the updated supplier; bokio_create_supplier adds a new one instead. WRITE.",
     { supplierId, companyId, supplier: supplierInput },
     async (a) =>
         ok(
@@ -1117,7 +1117,7 @@ tool(
 
 tool(
     "bokio_create_supplier_invoice",
-    "Create a supplier invoice, optionally attached to a file uploaded with bokio_upload_file. WRITE.",
+    "Create a supplier invoice, optionally attached to a file uploaded with bokio_upload_file. Returns the created supplier invoice. WRITE.",
     {
         companyId,
         supplierInvoice: supplierInvoiceBody.describe(
@@ -1136,7 +1136,7 @@ tool(
 
 tool(
     "bokio_update_supplier_invoice",
-    "Update a supplier invoice by id; line items left out of lineItems are removed. WRITE.",
+    "Update a supplier invoice by id; line items left out of lineItems are removed. Returns the updated supplier invoice; read the current one first with bokio_get_supplier_invoice. WRITE.",
     {
         supplierInvoiceId,
         companyId,
@@ -1201,7 +1201,7 @@ tool(
 
 tool(
     "bokio_create_customer",
-    "Create a customer, either a company or a private person. WRITE.",
+    "Create a customer, either a company or a private person. Returns the created customer; find it later with bokio_list_customers. WRITE.",
     { companyId, customer: customerInput },
     async (a) =>
         ok(
@@ -1215,7 +1215,7 @@ tool(
 
 tool(
     "bokio_update_customer",
-    "Update a customer by id with a full set of customer fields. WRITE.",
+    "Update a customer by id with a full set of customer fields. Returns the updated customer; bokio_create_customer adds a new one instead. WRITE.",
     { customerId, companyId, customer: customerInput },
     async (a) =>
         ok(
@@ -1247,7 +1247,7 @@ tool(
 
 tool(
     "bokio_create_item",
-    "Create an item (artikel) for invoice lines, with its price, VAT rate and bookkeeping account. WRITE.",
+    "Create an item (artikel) for invoice lines, with its price, VAT rate and bookkeeping account. Returns the created item; list items with bokio_list_items. WRITE.",
     { companyId, item: itemInput },
     async (a) =>
         ok(
@@ -1261,7 +1261,7 @@ tool(
 
 tool(
     "bokio_update_item",
-    "Update an item by id with a full set of item fields. WRITE.",
+    "Update an item by id with a full set of item fields. Returns the updated item; bokio_create_item adds a new one instead. WRITE.",
     { itemId, companyId, item: itemInput },
     async (a) =>
         ok(
@@ -1295,7 +1295,7 @@ tool(
 
 tool(
     "bokio_upload_file",
-    "Upload a local image or PDF, such as a receipt (kvitto), to Bokio, optionally attached to a journal entry. WRITE.",
+    "Upload a local image or PDF, such as a receipt (kvitto), to Bokio, optionally attached to a journal entry. Returns the created upload; fetch it later with bokio_get_upload. WRITE.",
     {
         companyId,
         filePath: z.string().describe("Absolute path to the file to upload"),
