@@ -329,7 +329,7 @@ async function saveDownload(path: string, savePath: string): Promise<Result> {
 
 tool(
     "bokio_company_info",
-    "Get the Bokio company's own details, such as its name and organisation number. Use it to confirm which company the token and companyId point at.",
+    "Get the company's own details from Bokio. Returns id, name, organizationNumber, companyType and address. Use it to confirm which company the token and companyId point at; bokio_list_fiscal_years lists its fiscal years.",
     { companyId },
     async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/company-information` })),
 );
@@ -344,7 +344,7 @@ tool(
 
 tool(
     "bokio_get_fiscal_year",
-    "Get one fiscal year by id, with its start and end dates. bokio_list_fiscal_years returns all of them in one call.",
+    "Get one fiscal year by id. Returns a fiscalYear object with startDate, endDate, accountingMethod and status. bokio_download_sie exports that year's SIE file.",
     { fiscalYearId, companyId },
     async (a) =>
         ok(await bokioRequest({ path: `${cbase(a.companyId)}/fiscal-years/${a.fiscalYearId}` })),
@@ -352,7 +352,7 @@ tool(
 
 tool(
     "bokio_chart_of_accounts",
-    "List the complete BAS chart of accounts in one unpaged call: account numbers with names. Narrow it with query on account, name or accountType, such as account>=3000&&account<=3999. Use bokio_get_account for one account; the ledger and balance tools take its number.",
+    "List the complete BAS chart of accounts in one unpaged call; returns account, name and accountType per account. Narrow it with query on account, name or accountType, such as account>=3000&&account<=3999. Use bokio_get_account for one account; the ledger and balance tools take its number.",
     { companyId, query },
     async (a) =>
         ok(
@@ -365,7 +365,7 @@ tool(
 
 tool(
     "bokio_get_account",
-    "Get one account from the BAS chart of accounts by number. For its balance or postings use bokio_account_balances or bokio_account_ledger.",
+    "Get one account from the BAS chart of accounts by number. Returns account, name, accountType and accountBalance, the current balance. For a balance on a date or the postings use bokio_account_balances or bokio_account_ledger.",
     { account, companyId },
     async (a) =>
         ok(await bokioRequest({ path: `${cbase(a.companyId)}/chart-of-accounts/${a.account}` })),
@@ -373,7 +373,7 @@ tool(
 
 tool(
     "bokio_download_sie",
-    "Download the raw SIE 4 export of one fiscal year to savePath, or return its first 4,000 characters as text when savePath is omitted. For balances, ledgers, VAT or profit and loss use the computed tools, which read this export themselves and do the arithmetic.",
+    "Download the raw SIE 4 export of one fiscal year to savePath and return the written path and byte count, or return its first 4,000 characters as text when savePath is omitted. For balances, ledgers, VAT or profit and loss use the computed tools such as bokio_account_balances, which read this export themselves and do the arithmetic.",
     { fiscalYearId, companyId, savePath: savePath.optional() },
     async (a) => {
         const path = `${cbase(a.companyId)}/sie/${a.fiscalYearId}/download`;
@@ -711,7 +711,7 @@ tool(
 
 tool(
     "bokio_get_journal_entry",
-    "Get one journal entry (verifikation) by id, as Bokio returns it. To find entries by date use bokio_list_journal_entries.",
+    "Get one journal entry (verifikation) by id. Returns title, journalEntryNumber, date, items with account, debit and credit per line, and reversingJournalEntryId or reversedByJournalEntryId. To find entries by date use bokio_list_journal_entries.",
     { journalEntryId, companyId },
     async (a) =>
         ok(
@@ -783,7 +783,7 @@ tool(
 
 tool(
     "bokio_get_invoice",
-    "Get one customer invoice by id, as Bokio returns it. Use bokio_download_invoice for the PDF and bokio_list_invoice_payments for its payments.",
+    "Get one customer invoice by id. Returns invoiceNumber, status, dueDate, totalAmount and paidAmount, with lineItems. Use bokio_download_invoice for the PDF and bokio_list_invoice_payments for its payments.",
     { invoiceId, companyId },
     async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/invoices/${a.invoiceId}` })),
 );
@@ -884,7 +884,7 @@ tool(
 
 tool(
     "bokio_download_invoice",
-    "Download a published invoice as a PDF file to savePath. Returns the written path and byte count; bokio_get_invoice returns the invoice data instead.",
+    "Download a customer invoice as a PDF file to savePath. Returns the written path and byte count. Drafts fail, because Bokio serves the PDF only for an invoice in a published status. bokio_get_invoice returns the invoice data and its status instead.",
     { invoiceId, companyId, savePath },
     async (a) => saveDownload(`${cbase(a.companyId)}/invoices/${a.invoiceId}/download`, a.savePath),
 );
@@ -954,7 +954,7 @@ tool(
 
 tool(
     "bokio_get_credit_note",
-    "Get one credit note by id, as Bokio returns it. Use bokio_download_credit_note for the PDF.",
+    "Get one credit note by id. Returns invoiceRef to the credited invoice, status, creditDate, totalAmount and lineItems. Use bokio_download_credit_note for the PDF.",
     { creditNoteId, companyId },
     async (a) =>
         ok(await bokioRequest({ path: `${cbase(a.companyId)}/credit-notes/${a.creditNoteId}` })),
@@ -962,7 +962,7 @@ tool(
 
 tool(
     "bokio_download_credit_note",
-    "Download a published credit note as a PDF file to savePath. Returns the written path and byte count.",
+    "Download a credit note as a PDF file to savePath. Returns the written path and byte count. Drafts fail, because Bokio serves the PDF only for a credit note in published status. bokio_get_credit_note returns its data and status instead.",
     { creditNoteId, companyId, savePath },
     async (a) =>
         saveDownload(`${cbase(a.companyId)}/credit-notes/${a.creditNoteId}/download`, a.savePath),
@@ -1055,7 +1055,7 @@ tool(
 
 tool(
     "bokio_get_supplier",
-    "Get one supplier by id, as Bokio returns it. Their invoices are listed by bokio_list_supplier_invoices.",
+    "Get one supplier by id. Returns name, orgNumber, vatNumber, currency and paymentDetails. Their invoices are listed by bokio_list_supplier_invoices.",
     { supplierId, companyId },
     async (a) =>
         ok(await bokioRequest({ path: `${cbase(a.companyId)}/suppliers/${a.supplierId}` })),
@@ -1105,7 +1105,7 @@ tool(
 
 tool(
     "bokio_get_supplier_invoice",
-    "Get one supplier invoice by id, as Bokio returns it. An attached file downloads with bokio_download_upload.",
+    "Get one supplier invoice by id. Returns supplierRef, dueDate, totalAmount, remainingAmount and uploadRefs. An attached file downloads with bokio_download_upload.",
     { supplierInvoiceId, companyId },
     async (a) =>
         ok(
@@ -1172,7 +1172,7 @@ tool(
 
 tool(
     "bokio_get_bank_payment",
-    "Get one bank payment by id. Bokio returns only payments created by this integration, and creating them is deliberately not exposed.",
+    "Get one bank payment by id. Returns status, amount, paymentDate and recipientRef. bokio_list_bank_payments filters payments by status or date.",
     { bankPaymentId, companyId },
     async (a) =>
         ok(await bokioRequest({ path: `${cbase(a.companyId)}/bank-payments/${a.bankPaymentId}` })),
@@ -1193,7 +1193,7 @@ tool(
 
 tool(
     "bokio_get_customer",
-    "Get one customer by id, as Bokio returns it. Their invoices are listed by bokio_list_invoices.",
+    "Get one customer by id. Returns name, customerNumber, type, orgNumber and paymentTerms. Their invoices are listed by bokio_list_invoices.",
     { customerId, companyId },
     async (a) =>
         ok(await bokioRequest({ path: `${cbase(a.companyId)}/customers/${a.customerId}` })),
@@ -1240,7 +1240,7 @@ tool(
 
 tool(
     "bokio_get_item",
-    "Get one item (artikel) by id, as Bokio returns it.",
+    "Get one item (artikel) by id. Returns description and itemType, and for sales items unitPrice, taxRate and bookkeepingAccountNumber. bokio_list_items lists and filters items.",
     { itemId, companyId },
     async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/items/${a.itemId}` })),
 );
@@ -1288,7 +1288,7 @@ tool(
 
 tool(
     "bokio_get_upload",
-    "Get one upload's metadata by id. bokio_download_upload fetches the file itself.",
+    "Get one upload's metadata by id. Returns description, contentType and journalEntryId. bokio_download_upload fetches the file itself.",
     { uploadId, companyId },
     async (a) => ok(await bokioRequest({ path: `${cbase(a.companyId)}/uploads/${a.uploadId}` })),
 );
@@ -1331,7 +1331,7 @@ tool(
 
 tool(
     "bokio_raw_get",
-    "Send a GET to any Bokio API path that no other tool covers; {companyId} in the path is replaced with the company id. Returns the response body.",
+    "Send a GET to any Bokio API path that no other tool covers; {companyId} in the path is replaced with the company id. Returns Bokio's JSON as text, or plain text for other responses; files go through the download tools. Prefer a named tool when one exists, such as bokio_list_journal_entries or bokio_get_invoice.",
     {
         path: z
             .string()
