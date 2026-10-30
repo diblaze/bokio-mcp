@@ -761,13 +761,18 @@ describe("tool definitions", () => {
     });
 
     it("descriptions are short and plain (Descriptions stay short and plain)", async () => {
+        let total = 0;
         for (const t of await listed()) {
             const d = t.description ?? "";
-            const sentences = d.replace("WRITE.", "").match(/[.!?](\s|$)/g) ?? [];
-            expect(sentences.length, `${t.name}: ${d}`).toBeLessThanOrEqual(3);
+            const text = d.replace("WRITE.", "").trim();
+            const sentences = text.match(/[.!?](\s|$)/g) ?? [];
+            expect(sentences.length, `${t.name}: ${d}`).toBeLessThanOrEqual(4);
+            expect(text.length, `${t.name}: ${d}`).toBeLessThanOrEqual(400);
             expect(d, t.name).not.toMatch(/\b(IMPORTANT|MUST|NEVER|ALWAYS|NOTE)\b/);
             if (t.annotations?.readOnlyHint === false) expect(d, t.name).toContain("WRITE.");
+            total += d.length;
         }
+        expect(total).toBeLessThanOrEqual(14_000);
     });
 
     it("savePath says where files land (Save path states where files land)", async () => {

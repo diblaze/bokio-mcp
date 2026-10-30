@@ -534,7 +534,7 @@ tool(
 
 tool(
     "bokio_reconcile_bank",
-    `Match bank statement rows against one ledger account by exact amount within toleranceDays, reading the SIE export itself; rows in date order each take the earliest unmatched ledger line within toleranceDays, each ledger line once. Returns matched pairs, unmatched rows on both sides, suspected duplicate ledger lines and totals, where difference = ledger minus bank. ${SIGN}`,
+    `Match bank statement rows against one ledger account in the SIE export: each row, in date order, takes the earliest unmatched ledger line of the same amount within toleranceDays. Returns matched pairs, unmatched rows on both sides, suspected duplicates and totals (difference = ledger minus bank). ${SIGN}`,
     {
         companyId,
         account: account.default(1930).describe("Ledger account to match; default 1930 (bank)."),
