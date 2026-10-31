@@ -2,6 +2,16 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/). Entries from 0.4.0 on are generated from commit messages by release-please.
 
+## [0.7.0](https://github.com/diblaze/bokio-mcp/compare/v0.6.0...v0.7.0) (2026-10-31)
+
+
+### Added
+
+* **tools:** computed tools state defaults, siblings ([3f27637](https://github.com/diblaze/bokio-mcp/commit/3f2763714d88fdfbd7f9ec3209c903e96e664b55))
+* **tools:** get and download tools state results ([2114456](https://github.com/diblaze/bokio-mcp/commit/2114456101891dbdfeaba80fca35ee643233835f))
+* **tools:** list tools state filters and paging ([0f71072](https://github.com/diblaze/bokio-mcp/commit/0f71072b5828fce04deab6558a0429c4ab85ab29))
+* **tools:** write tools state result and next tool ([c3f9480](https://github.com/diblaze/bokio-mcp/commit/c3f94809752df3d9cf2a68d71f5070081abee2cd))
+
 ## [0.6.0](https://github.com/diblaze/bokio-mcp/compare/v0.5.0...v0.6.0) (2026-10-28)
 
 
